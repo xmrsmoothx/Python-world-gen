@@ -64,6 +64,12 @@ def clamp(x,minimum,maximum):
         return maximum
     else:
         return x
+
+def strDivider(length):
+    n = ""
+    for l in range(length):
+        n += "_"
+    return n
             
 from scipy.spatial import Voronoi
 def relaxLloyd(pts,strength):
@@ -115,6 +121,8 @@ class Node:
         self.landmass = None
         self.bodyWater = None
         self.river = None
+        self.region = None
+        self.city = None
     def coords(self):
         tupleVert = (self.x,self.y)
         return tupleVert
@@ -199,12 +207,12 @@ class Node:
             nbrs.append(i.elevation)
         self.elevation = sum(nbrs)/len(nbrs)
     def setVegetation(self):
-        tempFitness = 1-abs(self.temp-0.7)
-        elevationFitness = clamp((1-self.elevation)-(self.slope/2),0,1)
-        fertilityFitness = self.fertility-self.metallicity
-        rainFitness = self.rainfall
-        vegFitness = (tempFitness*0.2+elevationFitness*0.2+fertilityFitness*0.3+rainFitness*0.25)
-        self.vegetation = clamp(vegFitness,0,1)
+        tempFitness = 1-abs(0.3-self.temp)
+        elevationFitness = 1-abs(0.45-self.elevation)
+        fertilityFitness = self.fertility+(self.metallicity*0.25)
+        rainFitness = 1-abs(self.rainfall-0.8)
+        vegFitness = ((tempFitness+1)*(elevationFitness+0.5)*(fertilityFitness+0.5)*(rainFitness+2))
+        self.vegetation = clamp(vegFitness/16,0,1)
     def setBiome(self,sl):
         if self.elevation > 0.9:
                 self.biome = "mountain"
@@ -238,7 +246,7 @@ class Node:
             else:
                 self.biome = "tropical"
         else:
-            if self.rainfall < 0.07:
+            if self.rainfall < 0.05:
                 self.biome = "desert"
             else:
                 self.biome = "tropical"
@@ -397,6 +405,7 @@ class River:
                 self.addNode(choice)
             j+=1
             current = choice
+        self.culturalNames = {}
     def removeRiver(self):
         for n in self.nodes:
             self.nodes.remove(n)
@@ -417,7 +426,7 @@ class River:
         for i in range(len(self.nodes)-1):
             n = self.nodes[i]
             n1 = self.nodes[i+1]
-            scale = xDim/4
+            scale = xDim/2
             w = clamp(1/n.slope,0,2048)/scale
             w1 = clamp(1/n1.slope,0,2048)/scale
             drawCircle(drawer,n.x,n.y,w,dCol)
@@ -431,6 +440,7 @@ class bodyWater:
         self.nodes = []
         self.addNode(rootNode)
         self.fill()
+        self.culturalNames = {}
     def addNode(self,p):
         if p not in self.nodes:
             self.nodes.append(p)
@@ -453,12 +463,26 @@ class Landmass:
         self.fill()
         self.size = len(self.nodes)
         self.centermass()
+        self.culturalNames = {}
+        self.landmassType = self.lType(self.size)
     def centermass(self):
         xTotal = sum([p.x for p in self.nodes])
         yTotal = sum([p.y for p in self.nodes])
         xx = xTotal/self.size
         yy = yTotal/self.size
         self.centroid = Node(xx,yy)
+    def lType(self,s):
+        if s <= 3:
+            t = "isle"
+        elif s <= 16:
+            t = "atoll"
+        elif s <= 512:
+            t = "island"
+        elif s <= 2048:
+            t = "land"
+        else:
+            t = "continent"
+        return t.capitalize()
     def landmassColor(self):
         h = math.floor(random.random()*255)
         s = 128+math.floor(random.random()*128)
@@ -489,17 +513,305 @@ class Landmass:
                 self.rivers.remove(r)
                 r.removeRiver()
 
-class influence:
-    def __init__(self,myMap,myInfluence):
-        self.influenceType = myInfluence
-        self.setOutput(myMap)
-    def setOutput(self,myMap):
-        self.influenceOutput = {}
-        for o in myMap.influenceOutputs:
-            if myMap.influences[self.influenceType].has_key(o):
-                self.influenceOutput[o] = myMap.influences[self.influenceType][o]
+class Region:
+    def __init__(self,rootNode):
+        self.root = rootNode
+        self.nodes = []
+        self.culturalNames = {}
+        self.addNode(self.root)
+        self.biome = self.root.biome
+        self.fill()
+        if self.biome == "boreal" or self.biome == "tropical":
+            self.biome += " forest"
+        if self.biome == "frozen":
+            self.biome += " tundra"
+        if self.biome == "water":
+            bodysize = len(self.nodes)
+            if bodysize > 1024:
+                self.biome = "ocean"
+            elif bodysize > 512:
+                self.biome = "sea"
             else:
-                self.influenceOutput[o] = 0
+                self.biome = "lake"
+    def addNode(self,p):
+        if p not in self.nodes:
+            self.nodes.append(p)
+            p.region = self
+    def fill(self):
+        for p in self.nodes:
+            for k in p.neighbors:
+                if k.biome == self.biome:
+                    self.addNode(k)
+
+class Influence:
+    def __init__(self,mMap,myNode,root):
+        self.node = myNode
+        self.rootNode = root
+        self.myMap = mMap
+        self.influenceOutput = {}
+        for o in self.myMap.influenceOutputs.keys():
+            self.influenceOutput[o] = 0
+        self.translateInfluence()
+    def setOutput(self,influenceType,strength):
+        for o in self.myMap.influenceOutputs:
+            if o in self.myMap.influences[influenceType]:
+                output = strength*self.myMap.influences[influenceType][o]
+                self.influenceOutput[o] += output
+    def translateInfluence(self):
+        if self.rootNode == 1:
+            for p in self.node.neighbors:
+                ni = Influence(self.myMap,p,0)
+                for j in ni.influenceOutput.keys():
+                    self.influenceOutput[j] += ni.influenceOutput[j]/len(self.node.neighbors)
+        strength = 1
+        inf = self.node.biome
+        self.setOutput(inf,strength)
+        strength = self.node.herbivores
+        inf = "carnivores"
+        self.setOutput(inf,strength)
+        strength = self.node.carnivores
+        inf = "herbivores"
+        self.setOutput(inf,strength)
+        strength = self.node.temp
+        inf = "temperature"
+        self.setOutput(inf,strength)
+        strength = self.node.elevation
+        inf = "elevation"
+        self.setOutput(inf,strength)
+        strength = self.node.slope
+        inf = "slope"
+        self.setOutput(inf,strength)
+        strength = self.node.vegetation
+        inf = "vegetation"
+        self.setOutput(inf,strength)
+        
+class Values:
+    def __init__(self,m,inf):
+        self.myMap = m
+        self.influences = inf
+        self.valuesOutput = {}
+        for v in self.myMap.valuesOutputs.keys():
+            self.valuesOutput[v] = 0
+        self.translateValues()
+        self.mainValues = self.valuesMain(5)
+    def maxval(self):
+        for k in self.valuesOutput.keys():
+            maxkey = k
+        for k in self.valuesOutput.keys():
+            if self.valuesOutput[k] > self.valuesOutput[maxkey]:
+                maxkey = k
+        return maxkey
+    def valuesMain(self,n):
+        mVals = {}
+        for f in range(n):
+            maxkey = self.maxval()
+            mVals[maxkey] = self.valuesOutput[maxkey]
+            del self.valuesOutput[maxkey]
+        return mVals
+    def translateValues(self):
+        for q in self.influences.influenceOutput.keys():
+            modifier = self.influences.influenceOutput[q]
+            roll = random.random()
+            if roll > 0.99:
+                modifier = 8
+            elif roll < 0.01:
+                modifier = 0.01
+            for v in self.myMap.values[q].keys():
+                self.valuesOutput[v] += self.myMap.values[q][v]*modifier*random.uniform(0.8,1.25)
+
+class City:
+    def __init__(self,n,pop=50,cltr=None,m=None):
+        self.myMap = m
+        self.myMap.cities.append(self)
+        self.node = n
+        self.node.city = self
+        self.population = pop
+        if cltr == None:
+            self.culture = Culture(self.node,m)
+        else:
+            self.culture = cltr
+        self.cityType = self.cType(self.population)
+        self.name = self.culture.language.genName()
+        self.region = self.node.region
+        if self.culture.name not in self.node.region.culturalNames:
+            self.node.region.culturalNames[self.culture.name] = self.culture.language.genName()
+        if self.culture.name not in self.node.landmass.culturalNames:
+            self.node.landmass.culturalNames[self.culture.name] = self.culture.language.genName()
+        for q in self.node.neighbors:
+            if q.region.biome == "ocean" or q.region.biome == "lake" or q.region.biome == "sea":
+                if self.culture.name not in q.region.culturalNames:
+                    q.region.culturalNames[self.culture.name] = self.culture.language.genName()
+        if self.node.river != None:
+            if self.culture.name not in self.node.river.culturalNames:
+                self.node.river.culturalNames[self.culture.name] = self.culture.language.genName()
+    def cType(self,p):
+        if p <= 20:
+            c = random.choice(["bivouac","camp","camp","encampment","campsite"])
+        elif p <= 100:
+            c = random.choice(["village","village","hamlet"])
+        elif p <= 500:
+            c = random.choice(["township","settlement"])
+        elif p <= 2000:
+            c = "town"
+        elif p <= 10000:
+            c = "city"
+        return c.capitalize()
+    def cityInfo(self):
+        n = self.name + " (" + self.cityType + ")\n"
+        n += "Population: " + str(self.population)
+        return n
+    def cultureInfo(self):
+        info = self.culture.information()
+        return info
+    def drawSelf(self,drawer):
+        drawCircle(drawer,self.node.x,self.node.y,4,(0,0,0))
+        drawCircle(drawer,self.node.x,self.node.y,2,(0,0,255))
+
+class Culture:
+    def __init__(self,n,m):
+        self.origin = n
+        self.myMap = m
+        self.myMap.cultures.append(self)
+        self.influences = Influence(self.myMap,self.origin,1)
+        self.value = Values(self.myMap,self.influences)
+        self.society = self.setSociety()
+        self.language = Language(self)
+        self.name = self.language.name
+    def setSociety(self):
+        m = self.value.mainValues
+        if "greed" in m and "worshippers" in m and "builders" in m:
+            return "Empire"
+        if "warriors" in m and "greed" in m and "builders" in m and ("travelers" in m or "sailors" in m):
+            return "Imperium"
+        if "warriors" in m and "collectivists" in m and "worshippers" in m:
+            return "Hegemony"
+        if "builders" in m and "collectivists" in m and "materialists" in m:
+            return "Socialists"
+        if "travelers" in m and "sailors" in m and "traders" in m:
+            return "Traders"
+        if "freedom" in m and "collectivists" in m and "simplicity" in m:
+            return "Paleolithic tribe"
+        if ("travelers" in m or "sailors" in m) and ("traders" in m or "greed" in m) and "freedom" in m:
+            return "Independent merchants"
+        if "collectivists" in m and "agriculture" in m and "materialists" in m:
+            return "Agricultural communists"
+        if "collectivists" in m and "agriculture" in m and "simplicity" in m:
+            return "Farming commune"
+        if "worshippers" in m and "warriors" in m and ("superstitious" in m or "collectivists" in m):
+            return "Religious zealots"
+        if "shamans" in m and ("naturalists" in m or "astrologists" in m) and "superstitious" in m:
+            return "Shamanistic tribe"
+        if "shamans" in m and "warriors" in m and ("astrologists" in m or "superstitious" in m or "worshippers" in m):
+            return "Shamanistic warriors"
+        if "metallurgists" in m and "builders" in m and "craftsmen" in m and "materialists" in m:
+            return "Cooperative artisans"
+        if "metallurgists" in m and "builders" in m and "craftsmen" in m and "traders" in m:
+            return "Merchant artisans"
+        if "freedom" in m and "greed" in m and "traders" in m:
+            return "Liberal capitalists"
+        if "freedom" in m and "traders" in m and ("builders" in m or "craftsmen" in m or "metallurgists" in m):
+            return "Liberal merchant-artisans"
+        if "builders" in m and "agriculture" in m and "traders" in m:
+            return "Mercantile folk"
+        if "builders" in m and "agriculture" in m and ("travelers" in m or "sailors" in m):
+            return "Township builders"
+        if ("craftsmen" in m or "metallurgy" in m or "builders" in m) and "simplicity" in m and ("naturalists" in m or "shamans" in m):
+            return "Naturalist artisans"
+        if ("craftsmen" in m or "metallurgy" in m or "builders" in m) and "simplicity" in m and ("superstitious" in m or "astrologists" in m):
+            return "Traditionalist artisans"
+        if "greed" in m and "sailors" in m and "warriors" in m:
+            return "Pirates"
+        if ("travelers" in m or "sailors" in m) and "greed" in m and "warriors" in m:
+            return "Raiders"
+        if ("travelers" in m or "sailors" in m) and "greed" in m and "simplicity" in m:
+            return "Scavengers"
+        if "travelers" in m and "simplicity" in m and "freedom" in m:
+            return "Hunter-gatherer tribe"
+        if "astrologists" in m and "superstitious" in m and "worshippers" in m:
+            return "Religious sovereignty"
+        if "collectivists" in m and "agriculture" in m and "naturalists" in m:
+            return "Agriculturalists"
+        if "travelers" in m and "simplicity" in m and ("metallurgists" in m or "craftsmen" in m or "builders" in m):
+            return "Nomadic artisans"
+        if "travelers" in m and "simplicity" and ("naturalists" in m or "superstitious" in m or "astrologists" in m or "shamans" in m):
+            return "Nomadic peoples"
+        if "materialists" in m and "metallurgists" in m and ("craftsmen" in m or "builders" in m):
+            return "Blacksmiths"
+        if "warriors" in m and "collectivists" in m and ("travelers" in m or "sailors" in m):
+            return "Revolutionary commune"
+        if "builders" in m and "metallurgists" in m and "craftsmen" in m and "agriculture" in m:
+            return "Syndicalists"
+        if "warriors" in m and "builders" in m and ("worshippers" in m or "superstitious" in m) and "freedom" not in m and "traders" not in m:
+            return "Nationalists"
+        return "Tribe"
+    def information(self):
+        info = ""
+        info += self.name + "\n"
+        info += "("+self.society+")" + "\n"
+        return info
+
+class Language:
+    def __init__(self,c):
+        self.culture = c
+        self.characters()
+        self.lengthPref = random.choice([3,5,9])
+        self.name = self.genName()
+    def characters(self):
+        c = ['b','c','d','f','g','h','j','k','l','m','n','p','q','r','s','t','v','w','x','y','z']
+        v = ['a','e','i','o','u']
+        self.langConsonants = []
+        self.langVowels = []
+        count = 32
+        n = 1
+        while len(c) > 0:
+            cons = random.choice(c)
+            for l in range(math.floor(count)):
+                self.langConsonants.append(cons)
+            c.remove(cons)
+            n += 1
+            count = 32*(1/n)
+        count = 32
+        while len(v) > 0:
+            vow = random.choice(v)
+            for l in range(math.floor(count)):
+                self.langVowels.append(vow)
+            v.remove(vow)
+            n += 1
+            count = 32*(1/n)
+    def genName(self):
+        length = random.randint(3,9)
+        length = math.floor((length+self.lengthPref)/2)
+        n = ""
+        con = 0
+        vow = 0
+        lastchar = '1'
+        for k in range(length):
+            ctype = random.choice(["con","vow"])
+            if vow >= 2:
+                ctype = "con"
+            if con >= 2:
+                ctype = "vow"
+            c = lastchar
+            if ctype == "con":
+                c = random.choice(self.langConsonants)
+                vow = 0
+                con += 1
+            if ctype == "vow":
+                c = random.choice(self.langVowels)
+                con = 0
+                vow += 1
+            while c == lastchar and (random.random() > 0.2):
+                if ctype == "con":
+                    c = random.choice(self.langConsonants)
+                    vow = 0
+                    con += 1
+                if ctype == "vow":
+                    c = random.choice(self.langVowels)
+                    con = 0
+                    vow += 1
+            n += c
+            lastchar = c
+        return n.capitalize()
 
 class Map:
     def __init__(self,aAtlas,numNodes,mapDimX,mapDimY):
@@ -509,6 +821,9 @@ class Map:
         self.yDim = mapDimY
         self.landmasses = []
         self.waterBodies = []
+        self.regions = []
+        self.cities = []
+        self.cultures = []
         self.sealevel = 0.4
         self.setNorth()
         self.biomeColors()
@@ -532,27 +847,97 @@ class Map:
     def nodeElevation(self,n):
         return "Elevation: " + str(round((n.elevation-self.sealevel)*self.eScale,1)) + "m"
     def nodeTemp(self,n):
-        if n.biome != "ocean":
+        if n.biome != "water":
             return "Temperature: " + str(round((n.temp*self.tempScale)-30,1)) + " degrees"
         else:
             return "Temperature: " + str(round((n.temp*self.tempScale*0.3),1)) + " degrees"
     def nodeRain(self,n):
-        return "Rainfall: " + str(round(n.rainfall*self.rainfallScale,1)) + "cm/yr"
+        if n.biome != "water":
+            rain =  "Rainfall: " + str(round(((n.rainfall)**2)*self.rainfallScale,1)) + "cm/yr"
+        else:
+            rain = "Rainfall: " + str(round((n.rainfall)*self.rainfallScale*0.03,1)) + "cm/yr"
+        return rain
     def nodeBiome(self,n):
         return n.biome
+    def nodeRegion(self,n):
+        if n.region.culturalNames == {}:
+            return "Unnamed " + n.region.biome + "\n"
+        else:
+            names = ""
+            for f in n.region.culturalNames.keys():
+                q = n.region.culturalNames[f] + " "
+                q += n.region.biome
+                q += " (" + f + " culture)"
+                names += q + "\n"
+            return names
+    def nodeLandmass(self,n):
+        if n.landmass.culturalNames == {}:
+            return "Unnamed " + n.landmass.landmassType + "\n"
+        else:
+            names = ""
+            for f in n.landmass.culturalNames.keys():
+                q = n.landmass.culturalNames[f] + " "
+                q += n.landmass.landmassType
+                q += " (" + f + " culture)"
+                names += q + "\n"
+            return names
+    def nodeRiver(self,n):
+        if n.river.culturalNames == {}:
+            return "Unnamed " + "river" + "\n"
+        else:
+            names = ""
+            for f in n.river.culturalNames.keys():
+                q = n.river.culturalNames[f] + " "
+                q += "river"
+                q += " (" + f + " culture)"
+                names += q + "\n"
+            return names
+    def nodeFertility(self,n):
+        return "Soil fertility: "+str(math.floor(n.fertility*self.fertScale))+"%"
+    def nodeMetallicity(self,n):
+        return "Ground metallicity: "+str(math.floor(n.metallicity*self.metalScale))+"ppm"
+    def nodeVegetation(self,n):
+        return "Vegetation: " + str(math.floor(n.vegetation*self.vegScale)) + "p/km"+chr(0x00B2)
+    def nodeHerbivores(self,n):
+        return "Hebivores: " + str(math.floor(n.herbivores*self.wildlifeScale)) + "/km"+chr(0x00B2)
+    def nodeCarnivores(self,n):
+        return "Carnivores: " + str(math.floor(n.carnivores*self.wildlifeScale)) + "/km"+chr(0x00B2)
+    def nodeCityInfo(self,n):
+        cityInfo = n.city.cityInfo() + "\n"
+        cityInfo += strDivider(self.divWidth) + "\n"
+        cityInfo += n.city.cultureInfo()
+        return cityInfo
     def infoScales(self):
         self.distScale = 12
         self.eScale = 2000
         self.tempScale = 105
-        self.rainfallScale = 257
+        self.rainfallScale = 7628
+        self.fertScale = 100
+        self.metalScale = 140000
+        self.vegScale = 10295
+        self.wildlifeScale = 500
     def nodeInfo(self,n):
-        info = "          Location Information:          \n"
-        info += self.nodeLat(n) + "\n"
-        info += self.nodeLong(n) + "\n"
+        self.divWidth = 48
+        info = ""
+        if n.city != None:
+            info += strDivider(self.divWidth)+"\n"
+            info += self.nodeCityInfo(n) + "\n"
+        info += strDivider(self.divWidth)+"\n"
+        info += self.nodeRegion(n) + "\n"
+        if n.landmass != None:
+            info += self.nodeLandmass(n) + "\n"
+        if n.river != None:
+            info += self.nodeRiver(n) + "\n"
         info += self.nodeElevation(n) + "\n"
         info += self.nodeTemp(n) + "\n"
         info += self.nodeRain(n) + "\n"
-        info += self.nodeBiome(n) + "\n"
+        if n.biome != "water":
+            info += strDivider(self.divWidth)+"\n"
+            info += self.nodeFertility(n) + "\n"
+            info += self.nodeMetallicity(n) + "\n"
+            info += self.nodeVegetation(n) + "\n"
+            info += self.nodeHerbivores(n) + "\n"
+            info += self.nodeCarnivores(n) + "\n"
         return info
     def nearestNode(self,xx,yy):
         n = self.atlas[0]
@@ -560,6 +945,16 @@ class Map:
         search = Node(xx,yy)
         for p in self.atlas:
             dist = p.dist(search)
+            if dist < minDist:
+                minDist = dist
+                n = p
+        return n
+    def nearestCity(self,xx,yy):
+        n = self.cities[0]
+        minDist = 1000000
+        search = Node(xx,yy)
+        for p in self.cities:
+            dist = p.node.dist(search)
             if dist < minDist:
                 minDist = dist
                 n = p
@@ -612,6 +1007,12 @@ class Map:
         print("Building lakes/oceans...")
         for p in self.atlas:
             self.buildBodyWater(p)
+    def buildRegions(self):
+        print("Building world regions...")
+        for p in self.atlas:
+            if p.region == None:
+                newReg = Region(p)
+                self.regions.append(newReg)
     def addRiver(self,length):
         c = 0
         while c < len(self.landmasses):
@@ -637,7 +1038,14 @@ class Map:
                 if p.elevation > 0.75:
                     multiplier = multiplier*((1-p.elevation)**2)
                 p.elevation = p.elevation+(maximum*multiplier)
-    def addMountains(self,num=5,height=0.25):
+    def addHill(self,xx,yy,maximum=0.25,radius=128):
+        hillCenter = Node(xx,yy)
+        for p in self.atlas:
+            dist = p.dist(hillCenter)
+            if dist <= radius:
+                multiplier = random.uniform(0.99,1.01)
+                p.elevation = maximum*multiplier
+    def addMountains(self,num=5,height=0.2):
         avgRad = self.xDim/3.5
         for i in range(num):
             xx = math.floor(random.random()*self.xDim)
@@ -646,7 +1054,7 @@ class Map:
             hillHeight = height*random.uniform(0.8,1.25)
             self.addSineHill(xx,yy,hillHeight,hillRad)
     def addHills(self,num=8,height=0.1):
-        avgRad = self.xDim/5
+        avgRad = self.xDim/6
         for i in range(num):
             xx = math.floor(random.random()*self.xDim)
             yy = math.floor(random.random()*self.yDim)
@@ -654,8 +1062,15 @@ class Map:
             hillHeight = height*random.uniform(0.8,1.25)
             self.addSineHill(xx,yy,hillHeight,hillRad)
     def addShape(self,shape):
-        if shape == "island":
+        if shape == "island" or shape == "volcanic":
             self.addSineHill(self.xDim/2,self.yDim/2,0.4,radius=self.xDim/1.5)
+            if shape == "volcanic":
+                self.smooth(4)
+                self.elevationAdd(-0.1)
+                self.addSineHill(self.xDim/2,self.yDim/2,0.25,radius=self.xDim*1.5)
+                self.smooth(4)
+                self.addHill(self.xDim/2,self.yDim/2,0.45,radius=self.xDim/11)
+                self.addSineHill(self.xDim/2,self.yDim/2,0.-0.1,radius=self.xDim/11)
         if shape == "shore" or shape == "highlands":
             corner = random.randint(0,3)
             if corner == 0:
@@ -672,11 +1087,20 @@ class Map:
                 yy = self.yDim
             self.addSineHill(xx,yy,0.45,radius=self.xDim*1.5)
             if shape == "highlands":
-                self.addSineHill(xx,yy,0.3,radius=self.xDim*2)  
+                self.addSineHill(xx,yy,0.3,radius=self.xDim*2)
+                self.addMountains()
         if shape == "archipelago":
-            self.addHills(16,0.2)
+            self.addHills(16,0.25)
         if shape == "plain":
             self.addSineHill(self.xDim/2,self.yDim/2,0.4,radius=self.xDim*5)
+        if shape != "volcanic":
+            self.addMountains()
+            self.addHills()
+            self.erode(3)
+            self.smooth(3)
+    def addRandomShape(self):
+        shp = random.choice(["highlands","plain","volcanic","shore","archipelago","island"])
+        self.addShape(shp)
     def erode(self,strength=3):
         for j in range(strength):
             for p in self.atlas:
@@ -718,11 +1142,11 @@ class Map:
             if p.river != None:
                 p.metallicity *= 1.25
             p.metallicity = clamp(p.metallicity,0,1)
-            fertilityBase = abs(p.elevation-(self.sealevel*1.15))
+            fertilityBase = abs(p.elevation-(self.sealevel*1.2))*random.uniform(0.8,1.25)
             if fertilityBase == 0:
                 p.fertility = 1
             else:
-                p.fertility = 1/fertilityBase
+                p.fertility = 0.07/fertilityBase
             if p.river != None:
                 p.fertility *= 2
             p.fertility = clamp(p.fertility,0,1)
@@ -758,39 +1182,209 @@ class Map:
         bColors["mountain"] = (134,0,136)
         bColors["water"] = (142,64,64)
         self.biomeColors = bColors
+    def values(self):
+        self.valuesOutputs = {"travelers":0,
+                              "craftsmen":0,
+                              "traders":0,
+                              "superstitious":0,
+                              "metallurgists":0,
+                              "worshippers":0,
+                              "freedom":0,
+                              "shamans":0,
+                              "astrologists":0,
+                              "materialists":0,
+                              "agriculture":0,
+                              "collectivists":0,
+                              "builders":0,
+                              "naturalists":0,
+                              "simplicity":0,
+                              "greed":0,
+                              "sailors":0,
+                              "warriors":0}
+        self.values = {}
+        self.values["swimming"] = {"simplicity":0.2,
+                   "sailors":0.6,
+                   "astrologists":0.15,
+                   "freedom":0.35,
+                   "warriors":0.05}
+        self.values["food"] = {"agriculture":-0.1,
+                   "greed":-0.25,
+                   "materialists":0.55,
+                   "collectivists":0.25,
+                   "simplicity":0.45,
+                   "worshippers":-0.2,
+                   "superstitious":-0.2,
+                   "traders":0.2,
+                   "warriors":0.2,
+                   "builders":0.25}
+        self.values["darkness"] = {"travelers":0.2,
+                   "collectivists":-0.4,
+                   "superstitious":0.7,
+                   "greed":0.4,
+                   "astrologists":0.25,
+                   "materialists":-0.15,
+                   "shamans":0.15,
+                   "freedom":-0.2,
+                   "warriors":0.5}
+        self.values["movement"] = {"travelers":0.8,
+                   "sailors":0.2,
+                   "traders":0.55,
+                   "astrologists":0.15,
+                   "builders":-0.4,
+                   "simplicity":0.4,
+                   "materialists":-0.15,
+                   "freedom":0.85,
+                   "naturalists":0.2,
+                   "collectivists":-0.2,
+                   "warriors":0.2}
+        self.values["plantlife"] = {"agriculture":0.25,
+                   "greed":0.15,
+                   "naturalists":0.25,
+                   "shamans":0.05,
+                   "craftsmen":0.4,
+                   "traders":0.15,
+                   "builders":0.4,
+                   "simplicity":-0.25,
+                   "collectivists":0.15}
+        self.values["nature"] = {"naturalists":0.35,
+                   "shamans":0.2,
+                   "agriculture":0.25,
+                   "freedom":0.25,
+                   "travelers":0.2,
+                   "simplicity":0.5,
+                   "collectivists":0.15,
+                   "superstitious":0.3,
+                   "astrologists":0.1,
+                   "metallurgists":0.4,
+                   "warriors":0.05}
+        self.values["growth"] = {"shamans":0.1,
+                   "agriculture":0.55,
+                   "naturalists":0.45,
+                   "metallurgists":-0.2,
+                   "freedom":0.15,
+                   "astrologists":-0.3,
+                   "collectivists":0.35,
+                   "materialists":-0.1,
+                   "warriors":0.05,
+                   "builders":0.15}
+        self.values["sky"] = {"travelers":0.55,
+                   "craftsmen":0.3,
+                   "traders":0.25,
+                   "superstitious":0.5,
+                   "metallurgists":0.1,
+                   "worshippers":0.5,
+                   "freedom":0.55,
+                   "shamans":0.1,
+                   "astrologists":0.7,
+                   "simplicity":0.4,
+                   "builders":0.1}
+        self.values["earth"] = {"metallurgists":1.2,
+                   "craftsmen":0.9,
+                   "traders":0.45,
+                   "materialists":0.75,
+                   "agriculture":0.25,
+                   "collectivists":0.4,
+                   "builders":0.6,
+                   "freedom":-0.25,
+                   "worshippers":-0.15,
+                   "greed":0.6,
+                   "superstitious":-0.25,
+                   "warriors":0.05,
+                   "astrologists":-0.2}
+        self.values["fields"] = {"agriculture":0.75,
+                   "builders":0.3,
+                   "materialists":0.5,
+                   "naturalists":0.35,
+                   "superstitious":-0.3,
+                   "simplicity":-0.3,
+                   "collectivists":0.25,
+                   "warriors":0.05}
+        self.values["sunlight"] = {"worshippers":0.9,
+                   "astrologists":0.6,
+                   "naturalists":0.15,
+                   "travelers":0.4,
+                   "simplicity":0.75,
+                   "freedom":0.6,
+                   "materialists":-0.2,
+                   "warriors":0.3,
+                   "builders":-0.1}
+        self.values["ice"] = {"superstitious":0.3,
+                   "simplicity":-0.4,
+                   "freedom":-0.4,
+                   "travelers":-0.5,
+                   "materialists":0.4,
+                   "sailors":0.1,
+                   "shamans":0.45,
+                   "greed":0.7,
+                   "metallurgists":0.2,
+                   "warriors":0.4,
+                   "agriculture":-0.2}
+        self.values["fear"] = {"superstitious":0.85,
+                   "worshippers":0.3,
+                   "shamans":0.8,
+                   "freedom":-0.55,
+                   "collectivists":0.4,
+                   "simplicity":-0.3,
+                   "builders":0.25,
+                   "greed":0.8,
+                   "materialists":-0.25,
+                   "warriors":0.65}
+        self.values["water"] = {"sailors":2,
+                   "simplicity":0.3,
+                   "freedom":0.75,
+                   "travelers":0.6,
+                   "builders":0.15,
+                   "craftsmen":0.1,
+                   "astrologists":0.45,
+                   "traders":0.75,
+                   "warriors":0.1}
     def influences(self):
-        self.influenceOutputs = {"sky":1,
-                                 "sunlight":1,
-                                 "fields":1,
-                                 "earth":1,
-                                 "ice":1,
-                                 "fear":1,
-                                 "water":1,
-                                 "growth":1,
-                                 "nature":1,
-                                 "plantlife":1,
-                                 "movement":1,
-                                 "darkness":1,
-                                 "swimming":1,
-                                 "food":1}
+        self.influenceOutputs = {"sky":0,
+                                 "sunlight":0,
+                                 "fields":0,
+                                 "earth":0,
+                                 "ice":0,
+                                 "fear":0,
+                                 "water":0,
+                                 "growth":0,
+                                 "nature":0,
+                                 "plantlife":0,
+                                 "movement":0,
+                                 "darkness":0,
+                                 "swimming":0,
+                                 "food":0}
         self.influences = {}
-        self.influences["elevation"] = {"sky":0.5,
-                       "sunlight":0.2,
+        self.influences["elevation"] = {"sky":0.3,
+                       "sunlight":0.15,
                        "fields":0.1,
                        "earth":0.1,
                        "ice":0.1,
                        "fear":0.05}
-        self.influences["slope"] = {"sky":0.2,
+        self.influences["slope"] = {"sky":0.1,
                        "sunlight":0.1,
-                       "earth":0.3,
-                       "fear":0.1}
-        self.influences["rainfall"] = {"water":0.35,
+                       "earth":0.1,
+                       "fear":0.05}
+        self.influences["temperature"] = {"sunlight":0.2,
+                       "darkness":-0.1,
+                       "sky":0.1,
+                       "movement":0.2,
+                       "fear":0.15,
+                       "water":0.05,
+                       "food":0.1}
+        self.influences["vegetation"] = {"nature":0.15,
+                       "food":0.15,
+                       "darkness":0.05,
+                       "plantlife":0.2,
+                       "sunlight":-0.1,
+                       "fields":-0.1}
+        self.influences["rainfall"] = {"water":0.5,
                        "growth":0.2,
                        "nature":0.1,
                        "sky":0.25,
                        "movement":0.1,
                        "darkness":0.1,
-                       "plantlife":0.1}
+                       "plantlife":0.1,
+                       "swimming":0.15}
         self.influences["vegetation"] = {"plantlife":0.6,
                        "growth":0.15,
                        "nature":0.35,
@@ -809,17 +1403,18 @@ class Map:
                        "fear":0.4,
                        "nature":0.15}
         self.influences["herbivores"] = {"nature":0.35,
-                       "food":0.5,
+                       "food":0.65,
                        "growth":0.3,
-                       "earth":0.1}
-        self.influences["river"] = {"water":0.5,
-                       "swimming":0.2,
+                       "earth":0.1,
+                       "plantlife":-0.1}
+        self.influences["river"] = {"water":2.5,
+                       "swimming":1.0,
                        "nature":0.1,
                        "food":0.35,
                        "growth":0.1,
                        "movement":0.3}
-        self.influences["water"] = {"water":0.6,
-                       "swimming":0.3,
+        self.influences["water"] = {"water":4.0,
+                       "swimming":1.5,
                        "sky":0.15,
                        "fear":0.2,
                        "darkness":0.35,
@@ -888,7 +1483,26 @@ class Map:
                        "plantlife":-0.2,
                        "fear":0.2,
                        "darkness":0.2,
-                       "fields":0.15}
+                       "fields":0.15,
+                       "water":0.4}
+    def placeCity(self,xx,yy,pop=50,culture=None,node=None):
+        if node != None:
+            cityNode = self.nearestNode(xx,yy)
+        else:
+            cityNode = node
+        if cityNode.biome != "water" and cityNode.city == None:
+            newCity = City(cityNode,pop,culture,self)
+            return 1
+        else:
+            return -1
+    def randomCity(self):
+        cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
+        while cityNode.biome == "water" or cityNode.city != None:
+            cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
+        newCity = City(cityNode,pop=random.randint(15,200),m=self)
+    def scatterCities(self,n):
+        for i in range(n):
+            self.randomCity()
     def drawGraph(self,gui=None):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -931,6 +1545,9 @@ class Map:
     def displayNode(self,event):
         clickedNode = self.nearestNode(event.x,event.y)
         self.displayString.set(self.nodeInfo(clickedNode))
+        cityNode = self.nearestCity(event.x,event.y)
+        if cityNode.node.dist(Node(event.x,event.y)) < 8:
+            self.displayString.set(self.nodeInfo(cityNode.node))
     def drawReal(self,gui=None):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -941,6 +1558,8 @@ class Map:
         for l in self.landmasses:
             for r in l.rivers:
                 r.drawRiver(graphDraw,self.xDim)
+        for c in self.cities:
+            c.drawSelf(graphDraw)
         if gui == None:
             visualAtlas = visualAtlas.convert("RGB")
             visualAtlas.save("map00.png","PNG")
@@ -1020,12 +1639,8 @@ world.triangles = triangles
 print("Generating terrain...")
 world.perlinElevation(6)
 world.elevationAdd(-0.35)
-world.addShape("archipelago")
-world.addMountains()
-world.addHills()
+world.addRandomShape()
 world.setSeaLevel(0.4)
-world.erode(3)
-world.smooth(3)
 world.cullDots()
 world.clampElevation()
 world.buildAllLand()
@@ -1035,8 +1650,11 @@ world.addMinorRiver(12)
 world.cullStreams()
 print("Defining biomes...")
 world.setBiomes()
+world.buildRegions()
 world.setWildlife()
 world.influences()
+world.values()
+world.scatterCities(16)
 print("Drawing map...")
 root = Tk()
 world.drawReal(root)
