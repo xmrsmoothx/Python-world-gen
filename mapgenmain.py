@@ -482,7 +482,7 @@ class Landmass:
             t = "land"
         else:
             t = "continent"
-        return t.capitalize()
+        return t
     def landmassColor(self):
         h = math.floor(random.random()*255)
         s = 128+math.floor(random.random()*128)
@@ -677,6 +677,7 @@ class Culture:
         self.society = self.setSociety()
         self.language = Language(self)
         self.name = self.language.name
+        self.title = self.setTitle()
     def setSociety(self):
         m = self.value.mainValues
         if "greed" in m and "worshippers" in m and "builders" in m:
@@ -744,9 +745,33 @@ class Culture:
         if "warriors" in m and "builders" in m and ("worshippers" in m or "superstitious" in m) and "freedom" not in m and "traders" not in m:
             return "Nationalists"
         return "Tribe"
+    def setTitle(self):
+        if self.society == "Nationalists":
+            return "Nation"
+        if self.society == "Religious sovereignty" or self.society == "Religious zealots":
+            return random.choice(["Theocracy","Ecclesiarchy","Order"])
+        if self.society == "Agriculturalists" or self.society == "Farming commune" or self.society == "Agricultural communists":
+            return random.choice(["Farmers","Yeomen","Peasants"])
+        if self.society == "Imperium" or self.society == "Hegemony" or self.society == "Empire":
+            return "Empire"
+        if self.society == "Nomadic artisans" or self.society == "Nomadic peoples" or self.society == "Scavengers":
+            return "Nomads"
+        if (self.society == "Liberal capitalists" or self.society == "Liberal merchant-artisans" or self.society == "Merchant artisans" or 
+            self.society == "Traders" or self.society == "Independent merchants" or self.society == "Mercantile folk"):
+            return "Caravans"
+        if (self.society == "Blacksmiths" or self.society == "Traditionalist artisans" or
+            self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
+            return "Artisans"
+        if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"):
+            return "Collective"
+        if (self.society == "Shamanistic warriors" or self.society == "Shamanistic tribe"):
+            return "Mystics"
+        if self.society == "Pirates" or self.society == "Raiders":
+            return "Brigands"
+        return "People"
     def information(self):
         info = ""
-        info += self.name + "\n"
+        info += self.name +" "+ self.title + "\n"
         info += "("+self.society+")" + "\n"
         return info
 
@@ -867,7 +892,7 @@ class Map:
             for f in n.region.culturalNames.keys():
                 q = n.region.culturalNames[f] + " "
                 q += n.region.biome
-                q += " (" + f + " culture)"
+                q += " (" + f + " language)"
                 names += q + "\n"
             return names
     def nodeLandmass(self,n):
@@ -878,7 +903,7 @@ class Map:
             for f in n.landmass.culturalNames.keys():
                 q = n.landmass.culturalNames[f] + " "
                 q += n.landmass.landmassType
-                q += " (" + f + " culture)"
+                q += " (" + f + " language)"
                 names += q + "\n"
             return names
     def nodeRiver(self,n):
@@ -889,7 +914,7 @@ class Map:
             for f in n.river.culturalNames.keys():
                 q = n.river.culturalNames[f] + " "
                 q += "river"
-                q += " (" + f + " culture)"
+                q += " (" + f + " language)"
                 names += q + "\n"
             return names
     def nodeFertility(self,n):
@@ -899,7 +924,7 @@ class Map:
     def nodeVegetation(self,n):
         return "Vegetation: " + str(math.floor(n.vegetation*self.vegScale)) + "p/km"+chr(0x00B2)
     def nodeHerbivores(self,n):
-        return "Hebivores: " + str(math.floor(n.herbivores*self.wildlifeScale)) + "/km"+chr(0x00B2)
+        return "Herbivores: " + str(math.floor(n.herbivores*self.wildlifeScale)) + "/km"+chr(0x00B2)
     def nodeCarnivores(self,n):
         return "Carnivores: " + str(math.floor(n.carnivores*self.wildlifeScale)) + "/km"+chr(0x00B2)
     def nodeCityInfo(self,n):
