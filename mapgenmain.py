@@ -123,6 +123,10 @@ class Node:
         self.river = None
         self.region = None
         self.city = None
+        self.culture = None
+        self.allegiance = 0
+        self.resourceRegion = None
+        self.resourceDist = 0
     def coords(self):
         tupleVert = (self.x,self.y)
         return tupleVert
@@ -252,6 +256,24 @@ class Node:
                 self.biome = "tropical"
         if self.elevation < sl:
             self.biome = "water"
+    def claim(self,n):
+        n.culture = self.culture
+        n.allegiance = self.allegiance+1
+        if self.culture.name not in n.region.culturalNames:
+            n.region.culturalNames[self.culture.name] = self.culture.language.genName()
+        if n.landmass != None:
+            if self.culture.name not in n.landmass.culturalNames:
+                n.landmass.culturalNames[self.culture.name] = self.culture.language.genName()
+        if n.river != None:
+            if self.culture.name not in n.river.culturalNames:
+                n.river.culturalNames[self.culture.name] = self.culture.language.genName()
+    def updateAllegiance(self):
+        if self.culture != None:
+            chance = 1/clamp(self.allegiance,0.00001,512)
+            for n in self.neighbors:
+                roll = random.random()
+                if roll <= chance:
+                    self.claim(n)
     def toString(self):
         self.selfString = "("
         self.selfString += str(self.x)
@@ -408,8 +430,8 @@ class River:
         self.culturalNames = {}
     def removeRiver(self):
         for n in self.nodes:
-            self.nodes.remove(n)
             n.river = None
+            self.nodes.remove(n)
     def addNode(self,newNode):
         self.nodes.append(newNode)
         newNode.river = self
@@ -633,6 +655,8 @@ class City:
         self.cityType = self.cType(self.population)
         self.name = self.culture.language.genName()
         self.region = self.node.region
+        self.node.culture = self.culture
+        self.node.allegiance = 1/self.population
         if self.culture.name not in self.node.region.culturalNames:
             self.node.region.culturalNames[self.culture.name] = self.culture.language.genName()
         if self.culture.name not in self.node.landmass.culturalNames:
@@ -644,6 +668,8 @@ class City:
         if self.node.river != None:
             if self.culture.name not in self.node.river.culturalNames:
                 self.node.river.culturalNames[self.culture.name] = self.culture.language.genName()
+        reg = ResourceRegion(self,self.myMap)
+        self.rawResources = [0,0]
     def cType(self,p):
         if p <= 20:
             c = random.choice(["bivouac","camp","camp","encampment","campsite"])
@@ -666,6 +692,93 @@ class City:
     def drawSelf(self,drawer):
         drawCircle(drawer,self.node.x,self.node.y,4,(0,0,0))
         drawCircle(drawer,self.node.x,self.node.y,2,(0,0,255))
+
+class ResourceRegion:
+    def __init__(self,c,m):
+        self.rootCity = c
+        self.myMap = m
+        self.culture = self.rootCity.culture
+        self.nodes = []
+        self.addNode(self.rootCity.node)
+        self.resources = [0,0]
+        self.updateReg()
+    def expungeReg(self):
+        self.myMap.resourceRegions.remove(self)
+    def addNode(self,node):
+        if node.resourceRegion != None:
+            node.resourceRegion.nodes.remove(node)
+        node.resourceRegion = self
+        self.nodes.append(node)
+    def cityCount(self):
+        c = 0
+        q = 0
+        for p in self.nodes:
+            if p.city != None:
+                c += 1
+                q += p.city.population
+        self.totalCities = c
+        self.totalPop = q
+    def sumResources(self):
+        self.resources = [0,0] # [Food resources, industrial resources]
+        rawPlant = 0
+        rawMetal = 0
+        rawAnimal = 0
+        for p in self.nodes:
+            if p.landmass != None:
+                rawPlant += p.vegetation
+                rawMetal += p.metallicity
+                rawAnimal += p.herbivores + (p.carnivores/3)
+            else:
+                rawAnimal += 0.1
+                rawPlant += 0.1
+        m = self.culture.value.mainValues
+        if "metallurgists" in m:
+            rawMetal = rawMetal*1.25
+        if "agriculture" in m:
+            rawPlant *= 1.15
+        if "warriors" in m:
+            rawAnimal *= 1.2
+        if "simplicity" in m:
+            rawMetal *= 0.75
+            rawAnimal *= 0.75
+            rawPlant *= 0.75
+        self.resources[0] = (rawPlant + (rawAnimal*0.7))*self.totalPop
+        self.resources[1] = (rawMetal + (rawAnimal*0.3) + (rawPlant*0.4))*self.totalPop
+        if "craftsmen" in m:
+            self.resources[1] *= 1.1
+        if "builders" in m:
+            self.resources[1] *= 1.1
+        if "collectivists" in m:
+            self.resources[0] *= 1.05
+    def updateReg(self):
+        for p in self.nodes:
+            if p.city != None:
+                p.resourceDist = math.log2(p.city.population)
+        for p in self.nodes:
+            for k in p.neighbors:
+                if k.resourceRegion != self and k.resourceRegion != None:
+                    # In this case, it's a different region OTHER than noRegion.
+                    if k.resourceRegion.culture != self.culture:
+                        # Interact with a different region of a different society...
+                        # This is a placeholder. In the future there will probably be wars here.
+                        k.resourceRegion = k.resourceRegion
+                    elif k.resourceRegion.culture == self.culture:
+                        # Interacting with a different region of the same society...
+                        if k.resourceDist < p.resourceDist:
+                            self.addNode(k)
+                            k.resourceDist = (p.resourceDist-1)/2
+                elif k.resourceRegion == None:
+                    if k.resourceDist < p.resourceDist:
+                        self.addNode(k)
+                        k.resourceDist = (p.resourceDist-1)/2
+                elif k.resourceRegion == self:
+                    if k.resourceDist < p.resourceDist:
+                        k.resourceDist = (p.resourceDist-1)/2
+        self.cityCount()
+        self.sumResources()
+        if len(self.nodes) == 0:
+            self.expungeReg()
+            return -1
 
 class Culture:
     def __init__(self,n,m):
@@ -735,7 +848,7 @@ class Culture:
         if "travelers" in m and "simplicity" in m and ("metallurgists" in m or "craftsmen" in m or "builders" in m):
             return "Nomadic artisans"
         if "travelers" in m and "simplicity" and ("naturalists" in m or "superstitious" in m or "astrologists" in m or "shamans" in m):
-            return "Nomadic peoples"
+            return "Nomadic tribe"
         if "materialists" in m and "metallurgists" in m and ("craftsmen" in m or "builders" in m):
             return "Blacksmiths"
         if "warriors" in m and "collectivists" in m and ("travelers" in m or "sailors" in m):
@@ -763,12 +876,16 @@ class Culture:
             self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
             return "Artisans"
         if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"):
-            return "Collective"
+            return random.choice(["People's Union","Union","Collective"])
         if (self.society == "Shamanistic warriors" or self.society == "Shamanistic tribe"):
             return "Mystics"
         if self.society == "Pirates" or self.society == "Raiders":
             return "Brigands"
         return "People"
+    def shortName(self):
+        name = ""
+        name += self.name + " " + self.title
+        return name
     def information(self):
         info = ""
         info += self.name +" "+ self.title + "\n"
@@ -794,7 +911,7 @@ class Language:
                 self.langConsonants.append(cons)
             c.remove(cons)
             n += 1
-            count = 32*(1/n)
+            count = 32*(1/n)*random.uniform(0.8,1.25)
         count = 32
         while len(v) > 0:
             vow = random.choice(v)
@@ -802,7 +919,7 @@ class Language:
                 self.langVowels.append(vow)
             v.remove(vow)
             n += 1
-            count = 32*(1/n)
+            count = 32*(1/n)*random.uniform(0.8,1.25)
     def genName(self):
         length = random.randint(3,9)
         length = math.floor((length+self.lengthPref)/2)
@@ -849,6 +966,7 @@ class Map:
         self.regions = []
         self.cities = []
         self.cultures = []
+        self.resourceRegions = []
         self.sealevel = 0.4
         self.setNorth()
         self.biomeColors()
@@ -928,10 +1046,20 @@ class Map:
     def nodeCarnivores(self,n):
         return "Carnivores: " + str(math.floor(n.carnivores*self.wildlifeScale)) + "/km"+chr(0x00B2)
     def nodeCityInfo(self,n):
-        cityInfo = n.city.cityInfo() + "\n"
-        cityInfo += strDivider(self.divWidth) + "\n"
+        cityInfo = n.city.cityInfo() + "\n" + "\n"
         cityInfo += n.city.cultureInfo()
         return cityInfo
+    def nodeTerritory(self,n):
+        territory = ""
+        if n.culture != None:
+            territory = n.culture.shortName() + " territory"
+        return territory
+    def nodeResReg(self,n):
+        if n.resourceRegion != None:
+            reg = "Inside " + n.resourceRegion.rootCity.name + " outskirts" + "\n"
+            reg += "Area food output: " + str(math.floor(n.resourceRegion.resources[0]*self.resourceScale)) + " t/year \n"
+            reg += "Area industrial output: " + str(math.floor(n.resourceRegion.resources[1]*self.resourceScale)) + " t/year \n"
+        return reg
     def infoScales(self):
         self.distScale = 12
         self.eScale = 2000
@@ -941,12 +1069,17 @@ class Map:
         self.metalScale = 140000
         self.vegScale = 10295
         self.wildlifeScale = 500
+        self.resourceScale = 1
     def nodeInfo(self,n):
         self.divWidth = 48
         info = ""
         if n.city != None:
             info += strDivider(self.divWidth)+"\n"
             info += self.nodeCityInfo(n) + "\n"
+        if n.resourceRegion != None:
+            info += strDivider(self.divWidth)+"\n"
+            info += self.nodeResReg(n)+"\n"
+        info += self.nodeTerritory(n) + "\n"
         info += strDivider(self.divWidth)+"\n"
         info += self.nodeRegion(n) + "\n"
         if n.landmass != None:
@@ -1228,7 +1361,7 @@ class Map:
                               "warriors":0}
         self.values = {}
         self.values["swimming"] = {"simplicity":0.2,
-                   "sailors":0.6,
+                   "sailors":0.8,
                    "astrologists":0.15,
                    "freedom":0.35,
                    "warriors":0.05}
@@ -1275,7 +1408,7 @@ class Map:
                    "shamans":0.2,
                    "agriculture":0.25,
                    "freedom":0.25,
-                   "travelers":0.2,
+                   "travelers":0.15,
                    "simplicity":0.5,
                    "collectivists":0.15,
                    "superstitious":0.3,
@@ -1327,7 +1460,7 @@ class Map:
         self.values["sunlight"] = {"worshippers":0.9,
                    "astrologists":0.6,
                    "naturalists":0.15,
-                   "travelers":0.4,
+                   "travelers":0.25,
                    "simplicity":0.75,
                    "freedom":0.6,
                    "materialists":-0.2,
@@ -1336,7 +1469,7 @@ class Map:
         self.values["ice"] = {"superstitious":0.3,
                    "simplicity":-0.4,
                    "freedom":-0.4,
-                   "travelers":-0.5,
+                   "travelers":-0.45,
                    "materialists":0.4,
                    "sailors":0.1,
                    "shamans":0.45,
@@ -1509,7 +1642,7 @@ class Map:
                        "fear":0.2,
                        "darkness":0.2,
                        "fields":0.15,
-                       "water":0.4}
+                       "water":0.1}
     def placeCity(self,xx,yy,pop=50,culture=None,node=None):
         if node != None:
             cityNode = self.nearestNode(xx,yy)
@@ -1573,6 +1706,37 @@ class Map:
         cityNode = self.nearestCity(event.x,event.y)
         if cityNode.node.dist(Node(event.x,event.y)) < 8:
             self.displayString.set(self.nodeInfo(cityNode.node))
+    def redraw(self):
+        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
+        graphDraw = ImageDraw.Draw(visualAtlas)
+        for tri in self.triangles:
+            tri.drawReal(graphDraw,self.sealevel)
+        for n in self.atlas:
+            n.drawReal(graphDraw,self.sealevel)
+        for l in self.landmasses:
+            for r in l.rivers:
+                r.drawRiver(graphDraw,self.xDim)
+        for c in self.cities:
+            c.drawSelf(graphDraw)
+        visualAtlas = visualAtlas.convert("RGB")
+        visualAtlas.save("map00.gif","GIF")
+        photo = Image.open("map00.gif")
+        self.img = ImageTk.PhotoImage(photo)
+        self.lbl.configure(image = self.img)
+        self.lbl.image = self.img
+    def updateResources(self):
+        for r in self.resourceRegions:
+            r.updateReg()
+    def updateTerritory(self):
+        for c in self.cities:
+            c.node.culture = c.culture
+            c.node.allegiance = 1/c.population
+        for p in self.atlas:
+            p.updateAllegiance()
+    def nextTurn(self):
+        self.updateResources()
+        self.updateTerritory()
+        self.redraw()
     def drawReal(self,gui=None):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -1599,10 +1763,13 @@ class Map:
             visualAtlas = visualAtlas.convert("RGB")
             visualAtlas.save("map00.gif","GIF")
             photo = Image.open("map00.gif")
-            img = ImageTk.PhotoImage(photo)
-            lbl = Label(gui,image=img)
-            lbl.pack()
-            lbl.bind("<Button-1>",self.displayNode)
+            self.img = ImageTk.PhotoImage(photo)
+            self.lbl = Label(gui,image=self.img)
+            self.lbl.pack()
+            self.lbl.bind("<Button-1>",self.displayNode)
+            b = Button(gui,text="Next Turn",command=self.nextTurn)
+            b.pack(side=RIGHT)
+            self.nextTurn()
             gui.mainloop()
 
 #----------------------------------------------------------------------#            
