@@ -670,17 +670,59 @@ class City:
                 self.node.river.culturalNames[self.culture.name] = self.culture.language.genName()
         reg = ResourceRegion(self,self.myMap)
         self.rawResources = [0,0]
+    def updateDemog(self):
+        rscShare = self.population/self.node.resourceRegion.totalPop
+        rscMax = [0,0]
+        rscMax[0] = rscShare*self.node.resourceRegion.resources[0]
+        rscMax[1] = rscShare*self.node.resourceRegion.resources[1]
+        mpo = 0.1   # Maximum personal output (max resources production per person)
+        m = self.culture.value.mainValues
+        if "agriculture" in m:
+            mpo *= 1.1
+        if "simplicity" in m:
+            mpo *= 0.8
+        if "warriors" in m:
+            mpo *= 1.05
+        if "builders" in m:
+            mpo *= 1.05
+        if "metallurgists" in m:
+            mpo *= 1.05
+        if "craftsmen" in m:
+            mpo *= 1.05
+        self.foodProduction = min(self.population*mpo,rscMax[0])
+        self.industrialProduction = min(self.population*mpo,rscMax[1])
+        mpc = 0.080     # Maximum personal consumption (max food needed per person)
+        mpc -= 0.002*(math.log10(clamp(self.population,1,1000000))+1)
+        # As the population grows, need less food per person due to economies of scale
+        mpc += 0.0015*math.log2(clamp(len(self.node.resourceRegion.nodes)-16,1,1000000))
+        # As the resource region grows, need more food per person due to transporation distance
+        if "collectivists" in m:
+            mpc -= 0.001
+        if "freedom" in m:
+            mpc += 0.001
+        if "simplicity" in m:
+            mpc -= 0.001
+        if "greed" in m:
+            mpc += 0.001
+        self.foodConsumption = mpc*self.population
+        diff = self.foodProduction-self.foodConsumption
+        growth = clamp(diff/mpc,-self.population*0.1,self.population*0.1)
+        self.population = math.ceil(self.population*0.99)  # Age related death
+        self.population = clamp(math.floor(self.population+growth+random.choice([-1,0,0,0,0,1])),1,1000000)
+        self.cityType = self.cType(self.population)
     def cType(self,p):
-        if p <= 20:
+        if p <= 35:
             c = random.choice(["bivouac","camp","camp","encampment","campsite"])
-        elif p <= 100:
+        elif p <= 200:
             c = random.choice(["village","village","hamlet"])
-        elif p <= 500:
+        elif p <= 1000:
             c = random.choice(["township","settlement"])
-        elif p <= 2000:
+        elif p <= 5000:
             c = "town"
-        elif p <= 10000:
+        elif p <= 20000:
             c = "city"
+        else:
+            c = "metropolis"
         return c.capitalize()
     def cityInfo(self):
         n = self.name + " (" + self.cityType + ")\n"
@@ -790,15 +832,15 @@ class City:
     def drawSelf(self,drawer):
         col = (0,0,255)
         out = (0,0,0)
-        if self.population <= 20:
+        if self.population <= 35:
             self.drawTent(drawer,self.node.x,self.node.y,col,out)
-        elif self.population <= 100:
+        elif self.population <= 200:
             self.drawHut(drawer,self.node.x,self.node.y,col,out)
-        elif self.population <= 500:
+        elif self.population <= 1000:
             self.drawVillage(drawer,self.node.x,self.node.y,col,out)
-        elif self.population <= 2000:
+        elif self.population <= 5000:
             self.drawTown(drawer,self.node.x,self.node.y,col,out)
-        elif self.population <= 10000:
+        elif self.population <= 20000:
             self.drawCity(drawer,self.node.x,self.node.y,col,out)
 
 class ResourceRegion:
@@ -850,8 +892,9 @@ class ResourceRegion:
             rawMetal *= 0.75
             rawAnimal *= 0.75
             rawPlant *= 0.75
-        self.resources[0] = (rawPlant + (rawAnimal*0.7))*self.totalPop
-        self.resources[1] = (rawMetal + (rawAnimal*0.3) + (rawPlant*0.4))*self.totalPop
+        scale = self.myMap.resourceScale
+        self.resources[0] = scale*(rawPlant + (rawAnimal*0.7))
+        self.resources[1] = scale*(rawMetal + (rawAnimal*0.3) + (rawPlant*0.4))
         if "craftsmen" in m:
             self.resources[1] *= 1.1
         if "builders" in m:
@@ -965,7 +1008,7 @@ class Culture:
             return "Syndicalists"
         if "warriors" in m and "builders" in m and ("worshippers" in m or "superstitious" in m) and "freedom" not in m and "traders" not in m:
             return "Nationalists"
-        return "Tribe"
+        return "Mixed society"
     def setTitle(self):
         if self.society == "Nationalists":
             return "Nation"
@@ -1028,6 +1071,7 @@ class Language:
             v.remove(vow)
             n += 1
             count = 32*(1/n)*random.uniform(0.8,1.25)
+        self.preferredStart = random.choice(self.langConsonants+self.langVowels)
     def genName(self):
         length = random.randint(3,9)
         length = math.floor((length+self.lengthPref)/2)
@@ -1059,6 +1103,8 @@ class Language:
                     c = random.choice(self.langVowels)
                     con = 0
                     vow += 1
+            if k == 0 and random.random() < 0.35:
+                c = self.preferredStart
             n += c
             lastchar = c
         return n.capitalize()
@@ -1075,9 +1121,11 @@ class Map:
         self.cities = []
         self.cultures = []
         self.resourceRegions = []
+        self.resourceScale = 100
         self.sealevel = 0.4
         self.setNorth()
         self.biomeColors()
+        self.displayNo = None
     def setNorth(self):
         nx = math.floor(random.random()*self.xDim)
         ny = math.floor(random.random()*self.yDim)
@@ -1165,8 +1213,8 @@ class Map:
     def nodeResReg(self,n):
         if n.resourceRegion != None:
             reg = "Inside " + n.resourceRegion.rootCity.name + " outskirts" + "\n"
-            reg += "Area food output: " + str(math.floor(n.resourceRegion.resources[0]*self.resourceScale)) + " t/year \n"
-            reg += "Area industrial output: " + str(math.floor(n.resourceRegion.resources[1]*self.resourceScale)) + " t/year \n"
+            reg += "Total food available: " + str(math.floor(n.resourceRegion.resources[0]*self.resourceScale)) + " t/year \n"
+            reg += "Total industrial resources available: " + str(math.floor(n.resourceRegion.resources[1]*self.resourceScale)) + " t/year \n"
         return reg
     def infoScales(self):
         self.distScale = 12
@@ -1287,6 +1335,7 @@ class Map:
             landmass = self.landmasses[math.floor(random.random()*len(self.landmasses))]
             if landmass.size > length*8:
                 c = 100000000
+            c += 1
         landmass.addRiver(length)
     def addMinorRiver(self,count):
         for i in range(count):
@@ -1766,7 +1815,7 @@ class Map:
     def randomCity(self):
         cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
         while (cityNode.biome == "water" or cityNode.city != None or
-               cityNode.x < 0 or cityNode.x > self.xDim or cityNode.y < 0 or cityNode.y > self.yDim):
+               cityNode.x < 32 or cityNode.x > self.xDim-32 or cityNode.y < 32 or cityNode.y > self.yDim-32):
             if len(self.cities) >= 1:
                 cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
                 while cityNode.dist(self.nearestCity(cityNode.x,cityNode.y).node) < 32:
@@ -1819,9 +1868,11 @@ class Map:
     def displayNode(self,event):
         clickedNode = self.nearestNode(event.x,event.y)
         self.displayString.set(self.nodeInfo(clickedNode))
+        self.displayNo = clickedNode
         cityNode = self.nearestCity(event.x,event.y)
         if cityNode.node.dist(Node(event.x,event.y)) < 8:
             self.displayString.set(self.nodeInfo(cityNode.node))
+            self.displayNo = cityNode.node
     def redraw(self):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -1840,6 +1891,8 @@ class Map:
         self.img = ImageTk.PhotoImage(photo)
         self.lbl.configure(image = self.img)
         self.lbl.image = self.img
+        if self.displayNo != None:
+            self.displayString.set(self.nodeInfo(self.displayNo))
     def updateResources(self):
         for r in self.resourceRegions:
             r.updateReg()
@@ -1849,8 +1902,12 @@ class Map:
             c.node.allegiance = 1/c.population
         for p in self.atlas:
             p.updateAllegiance()
+    def updateDemogs(self):
+        for c in self.cities:
+            c.updateDemog()
     def nextTurn(self):
         self.updateResources()
+        self.updateDemogs()
         self.updateTerritory()
         self.redraw()
     def drawReal(self,gui=None):
