@@ -689,9 +689,117 @@ class City:
     def cultureInfo(self):
         info = self.culture.information()
         return info
+    def drawTent(self,drawer,xx,yy,col,out):
+        p0 = (xx,yy-6)
+        p1 = (xx-4,yy+2)
+        p2 = (xx+4,yy+2)
+        drawer.polygon([p0,p1,p2],outline=out,fill=col)
+        p0 = (xx,yy-1)
+        p1 = (xx-1,yy+2)
+        p2 = (xx+1,yy+2)
+        drawer.polygon([p0,p1,p2],outline=out,fill=out)
+        p0 = (xx,yy-6)
+        p1 = (xx-2,yy-8)
+        p2 = (xx+2,yy-8)
+        drawer.line([p0,p1],fill=out,width=1)
+        drawer.line([p0,p2],fill=out,width=1)
+    def drawHut(self,drawer,xx,yy,col,out):
+        p0 = (xx+3,yy+2)
+        p1 = (xx-3,yy+2)
+        p2 = (xx-3,yy-3)
+        p3 = (xx,yy-6)
+        p4 = (xx+3,yy-3)
+        drawer.polygon([p0,p1,p2,p3,p4],outline=out,fill=col)
+        p1 = (xx-1,yy-1)
+        p2 = (xx+1,yy+2)
+        drawer.rectangle([p1,p2],outline=out,fill=out)
+        p0 = (xx,yy-6)
+        p1 = (xx+5,yy-1)
+        p2 = (xx-5,yy-1)
+        drawer.line([p0,p1],fill=out,width=1)
+        drawer.line([p0,p2],fill=out,width=1)
+    def drawVillage(self,drawer,xx,yy,col,out):
+        p0 = (xx,yy-5)
+        p1 = (xx-2,yy-7)
+        p2 = (xx-4,yy-5)
+        p3 = (xx-4,yy+3)
+        p4 = (xx,yy+3)
+        drawer.polygon([p0,p1,p2,p3,p4],outline=out,fill=col)
+        p0 = (xx-6,yy-3)
+        p2 = (xx+2,yy-3)
+        drawer.line([p1,p0],fill=out,width=1)
+        drawer.line([p1,p2],fill=out,width=1)
+        p3 = (xx-2,yy-4)
+        p4 = (xx-2,yy-3)
+        drawer.line([p4,p3],fill=out,width=1)
+        p0 = (xx,yy-1)
+        p1 = (xx+2,yy-3)
+        p2 = (xx+4,yy-1)
+        p3 = (xx+4,yy+3)
+        p4 = (xx,yy+3)
+        drawer.polygon([p0,p1,p2,p3,p4],outline=out,fill=col)
+        p0 = (xx-2,yy+1)
+        p2 = (xx+6,yy+1)
+        drawer.line([p1,p0],fill=out,width=1)
+        drawer.line([p1,p2],fill=out,width=1)
+        p3 = (xx+2,yy+3)
+        p4 = (xx+2,yy+1)
+        drawer.line([p4,p3],fill=out,width=1)
+    def drawTown(self,drawer,xx,yy,col,out):
+        p0 = (xx-4,yy+3)
+        p1 = (xx-4,yy-2)
+        p2 = (xx,yy-5)
+        p3 = (xx+4,yy-2)
+        p4 = (xx+4,yy+3)
+        drawer.polygon([p0,p1,p3,p4],outline=out,fill=col)
+        drawer.polygon([p1,p2,p3],outline=out,fill=out)
+        p0 = (xx-2,yy+4)
+        p1 = (xx-2,yy-5)
+        p2 = (xx,yy-7)
+        p3 = (xx+2,yy-5)
+        p4 = (xx+2,yy+4)
+        drawer.polygon([p0,p1,p3,p4],outline=out,fill=col)
+        drawer.polygon([p1,p2,p3],outline=out,fill=out)
+        p0 = (xx,yy)
+        p1 = (xx,yy+3)
+        drawer.line([p1,p0],fill=out,width=1)
+    def drawCity(self,drawer,xx,yy,col,out):
+        p0 = (xx-5,yy-3)
+        p1 = (xx-5,yy+1)
+        p2 = (xx-3,yy+1)
+        p3 = (xx-3,yy-5)
+        drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
+        p0 = (xx+5,yy-4)
+        p1 = (xx+5,yy+1)
+        p2 = (xx+3,yy+1)
+        p3 = (xx+3,yy-4)
+        drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
+        p0 = (xx-1,yy-7)
+        p1 = (xx-1,yy+2)
+        p2 = (xx+1,yy+2)
+        p3 = (xx+1,yy-7)
+        drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
+        p0 = (xx-6,yy+2)
+        p1 = (xx-6,yy-1)
+        p2 = (xx+6,yy-1)
+        p3 = (xx+6,yy+2)
+        drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
+        p0 = (xx,yy)
+        p1 = (xx,yy+1)
+        drawer.line([p1,p0],fill=out,width=1)
     def drawSelf(self,drawer):
-        drawCircle(drawer,self.node.x,self.node.y,4,(0,0,0))
-        drawCircle(drawer,self.node.x,self.node.y,2,(0,0,255))
+        col = (0,0,255)
+        out = (0,0,0)
+        if self.population <= 20:
+            self.drawTent(drawer,self.node.x,self.node.y,col,out)
+        elif self.population <= 100:
+            self.drawHut(drawer,self.node.x,self.node.y,col,out)
+        elif self.population <= 500:
+            self.drawVillage(drawer,self.node.x,self.node.y,col,out)
+        elif self.population <= 2000:
+            self.drawTown(drawer,self.node.x,self.node.y,col,out)
+        elif self.population <= 10000:
+            self.drawCity(drawer,self.node.x,self.node.y,col,out)
 
 class ResourceRegion:
     def __init__(self,c,m):
@@ -1108,6 +1216,8 @@ class Map:
                 n = p
         return n
     def nearestCity(self,xx,yy):
+        if len(self.cities) == 0:
+            return self.atlas[0]
         n = self.cities[0]
         minDist = 1000000
         search = Node(xx,yy)
@@ -1655,9 +1765,15 @@ class Map:
             return -1
     def randomCity(self):
         cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
-        while cityNode.biome == "water" or cityNode.city != None:
-            cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
-        newCity = City(cityNode,pop=random.randint(15,200),m=self)
+        while (cityNode.biome == "water" or cityNode.city != None or
+               cityNode.x < 0 or cityNode.x > self.xDim or cityNode.y < 0 or cityNode.y > self.yDim):
+            if len(self.cities) >= 1:
+                cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
+                while cityNode.dist(self.nearestCity(cityNode.x,cityNode.y).node) < 32:
+                    cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
+            else:
+                cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
+        newCity = City(cityNode,pop=random.randint(12,136),m=self)
     def scatterCities(self,n):
         for i in range(n):
             self.randomCity()
@@ -1768,7 +1884,7 @@ class Map:
             self.lbl.pack()
             self.lbl.bind("<Button-1>",self.displayNode)
             b = Button(gui,text="Next Turn",command=self.nextTurn)
-            b.pack(side=RIGHT)
+            b.pack(anchor=E,side=RIGHT)
             self.nextTurn()
             gui.mainloop()
 
