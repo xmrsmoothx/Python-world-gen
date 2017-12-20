@@ -1,7 +1,8 @@
 # Python-world-gen
-A shitty python worldgen project.
+A crazy python worldgen toy.
 
-Allegedly, this allows the user to satisfy dependencies and run the program!
+
+Allegedly, this allows the user to satisfy dependencies and run the program:
 
 >virtualenv venv -p python3
 >source venv/bin/activate
