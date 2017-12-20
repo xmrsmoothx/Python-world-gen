@@ -57,6 +57,12 @@ def unitCos(x):
 def distMod(x,maxDist):
     return unitCos(x/maxDist)
 
+def stick(val,minimum,maximum):
+    if abs(val-minimum) < abs(val-maximum):
+        return minimum
+    else:
+        return maximum
+
 def clamp(x,minimum,maximum):
     if x < minimum:
         return minimum
@@ -694,7 +700,7 @@ class City:
         mpc = 0.080     # Maximum personal consumption (max food needed per person)
         mpc -= 0.002*(math.log10(clamp(self.population,1,1000000))+1)
         # As the population grows, need less food per person due to economies of scale
-        mpc += 0.0015*math.log2(clamp(len(self.node.resourceRegion.nodes)-16,1,1000000))
+        mpc += 0.001*math.log2(clamp(len(self.node.resourceRegion.nodes)-16,1,1000000))
         # As the resource region grows, need more food per person due to transporation distance
         if "collectivists" in m:
             mpc -= 0.001
@@ -830,7 +836,7 @@ class City:
         p1 = (xx,yy+1)
         drawer.line([p1,p0],fill=out,width=1)
     def drawSelf(self,drawer):
-        col = (0,0,255)
+        col = self.culture.bannerColor
         out = (0,0,0)
         if self.population <= 35:
             self.drawTent(drawer,self.node.x,self.node.y,col,out)
@@ -942,6 +948,10 @@ class Culture:
         self.language = Language(self)
         self.name = self.language.name
         self.title = self.setTitle()
+        self.flag = Flag(self)
+        self.bannerColor = self.flag.colors[0]
+        self.leaderTitle = self.setLeaderTitle()
+        self.leader = Population(self,t=self.leaderTitle)
     def setSociety(self):
         m = self.value.mainValues
         if "greed" in m and "worshippers" in m and "builders" in m:
@@ -965,7 +975,7 @@ class Culture:
         if "worshippers" in m and "warriors" in m and ("superstitious" in m or "collectivists" in m):
             return "Religious zealots"
         if "shamans" in m and ("naturalists" in m or "astrologists" in m) and "superstitious" in m:
-            return "Shamanistic tribe"
+            return "Shamanic tribe"
         if "shamans" in m and "warriors" in m and ("astrologists" in m or "superstitious" in m or "worshippers" in m):
             return "Shamanistic warriors"
         if "metallurgists" in m and "builders" in m and "craftsmen" in m and "materialists" in m:
@@ -1008,6 +1018,20 @@ class Culture:
             return "Syndicalists"
         if "warriors" in m and "builders" in m and ("worshippers" in m or "superstitious" in m) and "freedom" not in m and "traders" not in m:
             return "Nationalists"
+        if "collectivists" in m and "freedom" in m:
+            return "Social Liberals"
+        if (("astrologists" in m and "superstitious" in m) or 
+            ("superstitious" in m and "worshippers" in m) or
+            ("woshippers" in m and "astrologists" in m)):
+            return "Religious Sovereignty"
+        if "collectivists" in m:
+            return "Communalists"
+        if "freedom" in m:
+            return "Liberals"
+        if "shamans" in m:
+            return "Shamans"
+        if "simplicity" in m:
+            return "Tribe"
         return "Mixed society"
     def setTitle(self):
         if self.society == "Nationalists":
@@ -1026,13 +1050,54 @@ class Culture:
         if (self.society == "Blacksmiths" or self.society == "Traditionalist artisans" or
             self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
             return "Artisans"
-        if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"):
+        if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"
+            or self.society == "Communalists"):
             return random.choice(["People's Union","Union","Collective"])
-        if (self.society == "Shamanistic warriors" or self.society == "Shamanistic tribe"):
+        if (self.society == "Shamanistic warriors" or self.society == "Shamanic tribe"
+            or self.society == "shamans"):
             return "Mystics"
         if self.society == "Pirates" or self.society == "Raiders":
             return "Brigands"
+        if self.society == "Social Liberals" or self.society == "Liberals":
+            return "Republic"
         return "People"
+    def setLeaderTitle(self):
+        if self.society == "Nationalists":
+            return (random.choice(["Master","High","Lord",""])+ " " +
+                    random.choice(["Commissioner","Chancellor","Harbinger"]))
+        if self.society == "Religious sovereignty" or self.society == "Religious zealots":
+            return (random.choice(["Grand","High","Supreme","Holy"]) + " " +
+                    random.choice(["Pontiff","Priest","Shepherd"]))
+        if self.society == "Agriculturalists" or self.society == "Farming commune" or self.society == "Agricultural communists":
+            return (random.choice(["Head","Chief","Master"])+ " " +
+                    random.choice(["Farmer","Agronomist","Foreman"]))
+        if self.society == "Imperium" or self.society == "Hegemony" or self.society == "Empire":
+            return "Emperor"
+        if self.society == "Nomadic artisans" or self.society == "Nomadic peoples" or self.society == "Scavengers":
+            return (random.choice(["Chief","Head","Elder"])+ " " +
+                    random.choice(["Captain","Dignitary","Herald"]))
+        if (self.society == "Liberal capitalists" or self.society == "Liberal merchant-artisans" or self.society == "Merchant artisans" or 
+            self.society == "Traders" or self.society == "Independent merchants" or self.society == "Mercantile folk"):
+            return (random.choice(["Primary","Head","Chief",""])+ " " +
+                    random.choice(["Executive","Director","Superintendent"]))
+        if (self.society == "Blacksmiths" or self.society == "Traditionalist artisans" or
+            self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
+            return (random.choice(["Master","Elder","Grandmaster"])+ " " +
+                    random.choice(["Atificer","Builder","Craftsman",""]))
+        if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"
+            or self.society == "Communalists"):
+            return (random.choice(["Prime","Chief","Central",""])+ " " +
+                    random.choice(["Director","Governer","Speaker"]))
+        if (self.society == "Shamanistic warriors" or self.society == "Shamanic tribe"
+            or self.society == "shamans"):
+            return (random.choice(["Elder","High","Grand","Ancestral"])+ " " +
+                    random.choice(["Medicine Man","Seer","Shaman"]))
+        if self.society == "Pirates" or self.society == "Raiders":
+            return (random.choice(["Chief","Head",""])+ " " +
+                    random.choice(["Captain","Commander",""]))
+        if self.society == "Social Liberals" or self.society == "Liberals":
+            return random.choice(["President","Speaker","Minister"])
+        return "Chief"
     def shortName(self):
         name = ""
         name += self.name + " " + self.title
@@ -1042,6 +1107,80 @@ class Culture:
         info += self.name +" "+ self.title + "\n"
         info += "("+self.society+")" + "\n"
         return info
+    def cultureNotes(self):
+        s = self.name + " " + self.title + "\n\n"
+        s += "Society type: " + self.society + "\n\n"
+        s += "Leader: " + self.leader.nameFull() + "\n\n" 
+        s += "Capital: " + self.origin.city.name + "\n\n"
+        return s
+
+class Population:
+    def __init__(self,c,n=None,t=""):
+        self.culture = c
+        if n == None:
+            self.name = (self.culture.language.genName(),self.culture.language.genName())
+        else:
+            self.name = n
+        self.title = t + " "
+        self.fullName = self.nameFull()
+    def nameFull(self):
+        return self.title + self.name[0] + " " + self.name[1]
+
+class Flag:
+    def __init__(self,c):
+        self.culture = c
+        self.xDim = 384
+        self.yDim = 192
+        self.colors = []
+        self.newColor()
+        self.genFlag()
+    def newColor(self):
+        h = random.randint(0,255)
+        s = random.randint(128,255)
+        v = random.randint(0,255)
+        col = (h,s,v)
+        self.colors.append(col)
+        return col
+    def randPt(self):
+        pt = (random.randint(0,self.xDim),random.randint(0,self.yDim))
+        return pt
+    def center(self):
+        return (self.xDim/2,self.yDim/2)
+    def addTri(self,drawer):
+        col = self.newColor()
+        p0 = random.choice(self.corners)
+        p1 = random.choice([(abs(self.xDim-p0[0]),p0[1]),(p0[0],abs(self.yDim-p0[1]))])
+        p2 = random.choice([self.center(),random.choice(self.corners)])
+        drawer.polygon([p0,p1,p2],fill=col,outline=col)
+    def addRect(self,drawer):
+        col = self.newColor()
+        p0 = random.choice([(random.randint(0,self.xDim),random.choice([0,self.yDim,self.yDim/2])),
+              (random.choice([0,self.xDim,self.xDim/2]),random.randint(0,self.yDim))])
+        p1 = random.choice(self.corners)
+        drawer.rectangle([p0,p1],fill=col,outline=col)
+    def addCirc(self,drawer):
+        col = self.newColor()
+        p0 = random.choice([(random.randint(0,self.xDim),random.choice([0,self.yDim,self.yDim/2])),
+              (random.choice([0,self.xDim,self.xDim/2]),random.randint(0,self.yDim))])
+        rad = random.randint(1,self.yDim)
+        drawCircle(drawer,p0[0],p0[1],rad,col)
+    def genFlag(self):
+        img = Image.new('HSV',(self.xDim,self.yDim),self.colors[0])
+        drawer = ImageDraw.Draw(img)
+        numElements = random.randint(1,4)
+        self.corners = [(0,0),(self.xDim,0),(0,self.yDim),(self.xDim,self.yDim)]
+        for i in range(numElements):
+            element = random.choice(["tri","rect","circ"])
+            if element == "tri":
+                self.addTri(drawer)
+            if element == "rect":
+                self.addRect(drawer)
+            if element == "circ":
+                self.addCirc(drawer)
+        
+        self.filename = "flag_" + self.culture.name + ".gif"
+        img = img.convert('RGB')
+        img.save(self.filename,"GIF")
 
 class Language:
     def __init__(self,c):
@@ -1126,6 +1265,7 @@ class Map:
         self.setNorth()
         self.biomeColors()
         self.displayNo = None
+        self.infoGui = None
     def setNorth(self):
         nx = math.floor(random.random()*self.xDim)
         ny = math.floor(random.random()*self.yDim)
@@ -1886,8 +2026,8 @@ class Map:
         for c in self.cities:
             c.drawSelf(graphDraw)
         visualAtlas = visualAtlas.convert("RGB")
-        visualAtlas.save("map00.gif","GIF")
-        photo = Image.open("map00.gif")
+        visualAtlas.save(self.mapname,"GIF")
+        photo = Image.open(self.mapname)
         self.img = ImageTk.PhotoImage(photo)
         self.lbl.configure(image = self.img)
         self.lbl.image = self.img
@@ -1902,6 +2042,9 @@ class Map:
             c.node.allegiance = 1/c.population
         for p in self.atlas:
             p.updateAllegiance()
+        for c in self.cities:
+            c.node.culture = c.culture
+            c.node.allegiance = 1/c.population
     def updateDemogs(self):
         for c in self.cities:
             c.updateDemog()
@@ -1910,6 +2053,25 @@ class Map:
         self.updateDemogs()
         self.updateTerritory()
         self.redraw()
+    def cultureInfo(self):
+        if self.displayNo == None:
+            return -1
+        if self.displayNo.culture == None:
+            return -1
+        self.displayCulture = self.displayNo.culture
+        if self.infoGui != None:
+            self.infoGui.destroy()
+        self.infoGui = Toplevel()
+        photo = Image.open(self.displayCulture.flag.filename)
+        self.flagImg = ImageTk.PhotoImage(photo)
+        self.flagLbl = Label(self.infoGui,image=self.flagImg)
+        self.flagLbl.config(borderwidth=32)
+        self.flagLbl.photo = photo
+        self.flagLbl.pack()
+        self.cultureString = StringVar()
+        self.cultureString.set(self.displayCulture.cultureNotes())
+        cdsc = Label(self.infoGui,textvariable=self.cultureString)
+        cdsc.pack()
     def drawReal(self,gui=None):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -1934,14 +2096,21 @@ class Map:
             desc = Label(gui,textvariable=self.displayString)
             desc.pack(side=RIGHT,fill=Y)
             visualAtlas = visualAtlas.convert("RGB")
-            visualAtlas.save("map00.gif","GIF")
-            photo = Image.open("map00.gif")
+            self.mapname = self.cultures[0].language.genName() + ".gif"
+            visualAtlas.save(self.mapname,"GIF")
+            photo = Image.open(self.mapname)
             self.img = ImageTk.PhotoImage(photo)
             self.lbl = Label(gui,image=self.img)
             self.lbl.pack()
             self.lbl.bind("<Button-1>",self.displayNode)
-            b = Button(gui,text="Next Turn",command=self.nextTurn)
-            b.pack(anchor=E,side=RIGHT)
+            b0 = Button(gui,text="Next Turn",command=self.nextTurn)
+            b0.pack(anchor=S,side=RIGHT)
+            c1 = "orange red"
+            b0.config(bg=c1,activebackground=c1,activeforeground=c1)
+            b1 = Button(gui,text="Society Info",command=self.cultureInfo)
+            b1.pack(anchor=S,side=RIGHT)
+            c1 = "medium aquamarine"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
             self.nextTurn()
             gui.mainloop()
 
