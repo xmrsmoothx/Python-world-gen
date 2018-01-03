@@ -562,8 +562,8 @@ class Landmass:
         yy = yTotal/self.size
         self.centroid = Node(xx,yy)
     def lType(self,s):
-        if s <= 3:
-            t = "isle"
+        if s <= 6:
+            t = "islet"
         elif s <= 16:
             t = "atoll"
         elif s <= 512:
@@ -961,6 +961,11 @@ class City:
         self.townGen.drawSelf(graphDraw)
         townImg = townImg.convert("RGB")
         townImg.save(self.townGen.mapName,"GIF")
+    def cityNotes(self):
+        s = self.name + "\n\n"
+        s += self.cType(self.population) + "\n\n"
+        s += "Population: " + str(self.population) + "\n\n"
+        return s
 
 class ResourceRegion:
     def __init__(self,c,m):
@@ -1061,6 +1066,7 @@ class Culture:
         self.society = self.setSociety()
         self.language = Language(self)
         self.name = self.language.name
+        self.populations = {}
         self.title = self.setTitle()
         self.flag = Flag(self)
         self.bannerColor = self.flag.colors[0]
@@ -1239,12 +1245,13 @@ class Culture:
 class Population:
     def __init__(self,c,n=None,t=""):
         self.culture = c
-        if n == None:
+        if n == None or n in self.culture.populations.keys():
             self.name = (self.culture.language.genName(),self.culture.language.genName())
         else:
             self.name = n
         self.title = t + " "
         self.fullName = self.nameFull()
+        self.culture.populations[self.name] = self
     def nameFull(self):
         return self.title + self.name[0] + " " + self.name[1]
 
@@ -1467,7 +1474,6 @@ class Map:
     def nodeCityInfo(self,n):
         cityInfo = n.city.cityInfo() + "\n" + "\n"
         cityInfo += n.city.cultureInfo()
-        n.city.drawTownGen()
         return cityInfo
     def nodeTerritory(self,n):
         territory = ""
@@ -2071,6 +2077,13 @@ class Map:
                        "darkness":0.2,
                        "fields":0.15,
                        "water":0.1}
+    def nearestCityDist(self,xx,yy):
+        if len(self.cities) < 1:
+            return self.xDim
+        else:
+            c = self.nearestCity(xx,yy).node
+            d = Node(xx,yy).dist(c)
+            return d
     def placeCity(self,xx,yy,pop=50,culture=None,node=None):
         if node != None:
             cityNode = self.nearestNode(xx,yy)
@@ -2082,15 +2095,11 @@ class Map:
         else:
             return -1
     def randomCity(self):
-        cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
+        cityNode = random.choice(self.atlas)
         while (cityNode.biome == "water" or cityNode.city != None or
-               cityNode.x < 32 or cityNode.x > self.xDim-32 or cityNode.y < 32 or cityNode.y > self.yDim-32):
-            if len(self.cities) >= 1:
-                cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
-                while cityNode.dist(self.nearestCity(cityNode.x,cityNode.y).node) < 32:
-                    cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
-            else:
-                cityNode = self.atlas[math.floor(random.random()*len(self.atlas))]
+               cityNode.x < 32 or cityNode.x > self.xDim-32 or cityNode.y < 32 
+               or cityNode.y > self.yDim-32 or self.nearestCityDist(cityNode.x,cityNode.y) < 32):
+            cityNode = random.choice(self.atlas)
         newCity = City(cityNode,pop=random.randint(12,136),m=self)
     def scatterCities(self,n):
         for k in self.atlas:
@@ -2212,6 +2221,26 @@ class Map:
         self.cultureString.set(self.displayCulture.cultureNotes())
         cdsc = Label(self.infoGui,textvariable=self.cultureString)
         cdsc.pack()
+    def cityInfo(self):
+        if self.displayNo == None:
+            return -1
+        if self.displayNo.city == None:
+            return -1
+        self.displayCity = self.displayNo.city
+        if self.infoGui != None:
+            self.infoGui.destroy()
+        self.infoGui = Toplevel()
+        self.displayCity.drawTownGen()
+        photo = Image.open(self.displayCity.townGen.mapName)
+        self.townImg = ImageTk.PhotoImage(photo)
+        self.townLbl = Label(self.infoGui,image=self.townImg)
+        self.townLbl.config(borderwidth=2)
+        self.townLbl.photo = photo
+        self.townLbl.pack()
+        self.cityString = StringVar()
+        self.cityString.set(self.displayCity.cityNotes())
+        cdsc = Label(self.infoGui,textvariable=self.cityString)
+        cdsc.pack()
     def changeView(self):
         if self.viewmode == 1:
             self.viewmode = 0
@@ -2257,6 +2286,10 @@ class Map:
             b1.pack(anchor=S,side=RIGHT)
             c1 = "medium aquamarine"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+            b3 = Button(gui,text="Settlement Info",command=self.cityInfo)
+            b3.pack(anchor=S,side=RIGHT)
+            c1 = "aquamarine"
+            b3.config(bg=c1,activebackground=c1,activeforeground=c1)
             b2 = Button(gui,text="Change Mode",command=self.changeView)
             b2.pack(anchor=S,side=RIGHT)
             c1 = "sandy brown"

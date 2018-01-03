@@ -5,8 +5,10 @@ Created on Tue Dec 26 14:52:37 2017
 @author: Bri
 """
 
-import math
+import numpy as np
 import random
+import math
+from scipy.spatial import Voronoi
 
 def clamp(x,minimum,maximum):
     if x < minimum:
@@ -22,183 +24,314 @@ def drawCircle(drawer,x,y,radius,color):
     y1 = y-radius
     y2 = y+radius
     drawer.ellipse([(x1,y1),(x2,y2)],color)
-    
-def lengthDirX(length, angle):
-  radian_angle = math.radians(angle)
-  return length * math.cos(radian_angle)
-
-def lengthDirY(length, angle):
-  radian_angle = math.radians(angle)
-  return length * math.sin(radian_angle)
-
-def A(dx, dy):
-  return math.degrees( math.atan2(dy, dx) )
-
-def drawTrapezoid(drawer,x1,y1,x2,y2,r1,r2,color):
-    directAngle = A(x2-x1,y2-y1)
-    pAngle = directAngle-90
-    pAngle2 = pAngle-180
-    p1 = (x1+lengthDirX(r1,pAngle),y1+lengthDirY(r1,pAngle))
-    p2 = (x1+lengthDirX(r1,pAngle2),y1+lengthDirY(r1,pAngle2))
-    p3 = (x2+lengthDirX(r2,pAngle2),y2+lengthDirY(r2,pAngle2))
-    p4 = (x2+lengthDirX(r2,pAngle),y2+lengthDirY(r2,pAngle))
-    drawer.polygon([p1,p2,p3,p4],color,color)
-
-def getKey(n):
-    return n.key
-
-def sd(node):
-    seed = 0
-    seed += node.x*0.1
-    seed += node.y*0.25
-    seed += node.elevation*8
-    seed += (node.x*node.y) % 17
-    return seed
-
-def ptDist(n1,n2,dt):
-    d = math.sqrt(((n2.x-n1.x)**2)+((n2.y-n1.y)**2))
-    t = dt/d
-    xx = ((1-t)*n1.x) + (t*n2.x)
-    yy = ((1-t)*n1.y) + (t*n2.y)
-    n = StreetNode(xx,yy,n1.town)
-    return n
-
-def binRoll(n,d):
-    if math.floor(n.x) % 2 == 0:
-        s = (n.x*89*d) + (n.y*73*d)
-    else:
-        s = (n.x*37*d) + (n.y*53*d)
-    s = (s % 31) + d
-    if math.floor(s) % math.floor(d) == 0:
-        r = 1
-    else:
-        r = 0
-    return r
-
-def seedAmount(n,d,minimum,maximum):
-    d = d + 1
-    if math.floor(n.x) % 2 == 0:
-        s = (n.x*149*d) + (n.y*17*d)
-    else:
-        s = (n.x*73*d) + (n.y*29*d)
-    ct = maximum-minimum
-    val = (s % ct) + minimum
-    return val
 
 class StreetNode:
-    def __init__(self,xx,yy,t,k=0):
-        self.town = t
+    def __init__(self,coords):
+        self.x = coords[0]
+        self.y = coords[1]
+        self.neighbors = []
+        self.type = None
+    def dist(self,x,y):
+        dx = abs(self.x-x)
+        dy = abs(self.y-y)
+        dist = math.sqrt((dx**2) + (dy**2))
+        return dist
+    def midpt(self,n):
+        xx = (self.x + n.x)/2
+        yy = (self.y + n.y)/2
+        return (xx,yy)
+    def edgept(self,nbr,seed):
+        d = self.dist(nbr.x,nbr.y)
+        if d == 0:
+            d = 1
+        dt = (seed*self.x*self.y*37.13529) % d
+        t = dt/d
+        xx = ((1-t)*self.x) + (t*nbr.x)
+        yy = ((1-t)*self.y) + (t*nbr.y)
+        n = StreetNode((xx,yy))
+        return n
+
+class Street:
+    def __init__(self,n0,n1,w=2):
+        self.nodes = [None,None]
+        self.nodes[0] = n0
+        self.nodes[1] = n1
+        n0.neighbors.append(n1)
+        n1.neighbors.append(n0)
+        self.exists = 1
+        self.width = w
+    def streetDist(self,x,y):
+        d = (self.nodes[0].dist(x,y)+self.nodes[1].dist(x,y))/2
+        return d
+    def length(self):
+        return self.nodes[0].dist(self.nodes[1].x,self.nodes[1].y)
+    def cull(self):
+        self.nodes[1].x = self.nodes[0].x
+        self.nodes[1].y = self.nodes[0].y
+        self.exists = 0
+    def drawSelf(self,drawer,col):
+        drawCircle(drawer,self.nodes[0].x,self.nodes[0].y,self.width-1,col)
+        drawer.line([(self.nodes[0].x,self.nodes[0].y),(self.nodes[1].x,self.nodes[1].y)],fill=col,width=self.width*2)
+        drawCircle(drawer,self.nodes[1].x,self.nodes[1].y,self.width-1,col)
+
+class Block:
+    def __init__(self,m):
+        self.myTown = m
+        self.verts = []
+        self.subblocks = []
+        self.substreets = []
+        self.type = None
+    def centroid(self):
+        if len(self.verts) != 0:
+            xx = sum([n.x for n in self.verts])/len(self.verts)
+            yy = sum([n.y for n in self.verts])/len(self.verts)
+        else:
+            xx = 0
+            yy = 0
         self.x = xx
         self.y = yy
-        self.key = k
-        self.neighbors = []
-        self.outRoad = 0
-        self.outRiver = 0
-    def link(self,n):
-        if n not in self.neighbors:
-            self.neighbors.append(n)
-            n.neighbors.append(n)
-            e = StreetEdge(self,n,self.town)
-    def isLinked(self,n):
-        if n in self.neighbors:
+        return [self.x,self.y]
+    def ccw(self,p0,p1,c):
+        # Return 1 if p1 is counterclockwise from p0 with c as center; otherwise, return 0
+        cx = c[0]
+        cy = c[1]
+        v0x = p0.x-cx
+        v0y = p0.y-cy
+        v1x = p1.x-cx
+        v1y = p1.y-cy
+        if v0y*v1x > v0x*v1y:
             return 1
         else:
             return 0
-    def coords(self):
-        return (self.x,self.y)
-    def perturb(self):
-        pDist = math.ceil(self.town.xDim/64)
-        xDrift = (self.x*71+self.y*83) % pDist
-        if math.floor(xDrift) % 2 == 0:
-            xDrift *= -1
-        yDrift = (self.x*83+self.y*71) % pDist
-        if math.floor(yDrift) % 2 == 0:
-            yDrift *= -1
-        self.x = self.x+xDrift
-        self.y = self.y+yDrift
-    def drawSelf(self,drawer):
-        drawCircle(drawer,self.x,self.y,3,(0,0,0))
-
-class StreetEdge:
-    def __init__(self,n1,n2,t):
-        self.node1 = n1
-        self.node2 = n2
-        self.town = t
-        self.town.edges.append(self)
+    def blockDist(self,x,y):
+        self.centroid()
+        dx = abs(self.x-x)
+        dy = abs(self.y-y)
+        dist = math.sqrt((dx**2) + (dy**2))
+        return dist
+    def sharedNeighbors(self,f):
+        s = 0
+        for p in self.verts:
+            if p in f.verts:
+                s += 1
+        return s
+    def orderccw(self):
+        n = len(self.verts)
+        for i in range(n):
+            for j in range(n):
+                aa = j
+                bb = (j+1) % n
+                if self.ccw(self.verts[aa],self.verts[bb],self.centroid()) == 0:
+                    t = self.verts[aa]
+                    self.verts[aa] = self.verts[bb]
+                    self.verts[bb] = t
+    def polyArea(self):
+        self.orderccw()
+        n = len(self.verts)
+        area = 0
+        for i in range(n):
+            j = (i+1) % n
+            aa = self.verts[i]
+            bb = self.verts[j]
+            yy = (aa.y+bb.y)/2
+            xx = (aa.x-bb.x)
+            zz = xx*yy
+            area += zz
+        area = abs(area)
+        self.area = area
+        return area
+    def subdivide(self,size=1028):
+        a = self.polyArea()
+        if self.area > size and len(self.verts) > 3:
+            random.seed(self.area)
+            sub = 0
+            div0 = None
+            div1 = None
+            pts = []
+            pts1 = []
+            while sub == 0:
+                base0 = random.choice(self.verts)
+                nbr0 = random.choice(base0.neighbors)
+                while nbr0 not in self.verts:
+                    nbr0 = random.choice(base0.neighbors)
+                div0 = StreetNode(base0.midpt(nbr0))
+                s = Street(div0,nbr0)
+                s = Street(div0,base0)
+                base1 = random.choice(self.verts)
+                nbr1 = random.choice(base1.neighbors)
+                while nbr1 not in self.verts:
+                        nbr1 = random.choice(base1.neighbors)
+                div1 = StreetNode(base1.midpt(nbr1))
+                while div1 == div0:
+                    base1 = random.choice(self.verts)
+                    nbr1 = random.choice(base1.neighbors)
+                    while nbr1 not in self.verts:
+                        nbr1 = random.choice(base1.neighbors)
+                    div1 = StreetNode(base1.midpt(nbr1))
+                s = Street(div1,nbr1)
+                s = Street(div1,base1)
+                c = div0.midpt(div1)
+                pts = []
+                for p in self.verts:
+                    if self.ccw(div1,p,c) == 0 and self.ccw(div0,p,c) == 1:
+                        pts.append(p)
+                pts1 = []
+                for p in self.verts:
+                    if p not in pts:
+                        pts1.append(p)
+                l0 = len(pts)+2
+                l1 = len(pts1)+2
+                if l0 > 3 and l1 > 3:
+                    sub = 1
+            ww = random.randint(2,4)
+            q = Street(div0,div1,ww)
+            s = Block(self.myTown)
+            s.verts = [div1,div0]
+            s.verts.extend(pts)
+            s.subdivide(size)
+            self.subblocks.append(s)
+            s1 = Block(self.myTown)
+            s1.verts = [div1,div0]
+            s1.verts.extend(pts1)
+            s1.subdivide(size)
+            self.subblocks.append(s1)
+            self.substreets.append(q)
     def drawSelf(self,drawer):
         dCol = (0,0,0)
-        r1 = 1
-        r2 = 1
-        drawTrapezoid(drawer,self.node1.x,self.node1.y,self.node2.x,self.node2.y,r1,r2,dCol)
-        
-class TownHex:
-    def __init__(self,size,t,hexid=0):
-        self.town = t
-        self.verts = self.town.verts
-        self.pts = []
-        self.innerPts = []
-        self.town.d = self.town.d + seedAmount(self.town.center,size+3,1,3)
-        for i in range(self.verts):
-            dist = (size+1+self.town.d)*((self.town.xDim*0.8)/self.town.maxHexSize)
-            n = ptDist(self.town.center,self.town.nbrs[i],dist)
-            self.pts.append(n)
-            r = binRoll(n,3)
-            if size > 0:
-                parent = self.town.hexes[size-1]
-                self.innerPts.append(parent.pts[i])
-                if r == 0:
-                    self.pts[i].link(self.innerPts[i])
-            r = binRoll(n,3.3)
-            if i != 0:
-                if r == 0:
-                    self.pts[i].link(self.pts[i-1])
-            if i == self.verts-1:
-                if r == 0:
-                    self.pts[i].link(self.pts[0])
-        for q in self.pts:
-            q.x = (self.town.center.x+q.x)/2
-            q.y = (self.town.center.y+q.y)/2
-        for q in self.pts:
-            q.perturb()
-                
-    
+        if self.type == "water":
+            dCol = (142,64,64)
+        if len(self.verts) > 1:
+            vts = [(p.x,p.y) for p in self.verts]
+            drawer.polygon(vts,dCol,dCol)
+        for k in self.subblocks:
+            k.drawSelf(drawer)
+        for k in self.substreets:
+            k.drawSelf(drawer,self.myTown.streetColor)
+
 class Town:
-    def __init__(self,n,m,nom=""):
-        self.node = n
+    def __init__(self,n,m,nom):
         self.myMap = m
-        self.mapName = "town_"+nom+".gif"
-        self.xDim = 512
-        self.yDim = 512
-        xx = self.xDim/2
-        yy = self.yDim/2
-        self.center = StreetNode(xx,yy,self)
-        self.nbrs = []
-        self.d = 0
-        for k in self.node.neighbors:
-            scale = 16
-            dx = (k.x-self.node.x)*scale
-            dy = (k.y-self.node.y)*scale
-            x1 = self.center.x+dx
-            y1 = self.center.y+dy
-            key = math.atan2(y1-yy,x1-xx)
-            nd = StreetNode(x1,y1,self,key)
-            if k in self.node.roads:
-                nd.outRoad = 1
-            if k.river == self.node.river:
-                nd.outRiver = 1
-            self.nbrs.append(nd)
-        self.nbrs = sorted(self.nbrs,key=lambda streetnode: streetnode.key)
-        self.verts = len(self.nbrs)
-        self.seed = sd(self.node)
+        self.node = n
+        self.name = nom
+        self.mapName = "town_"+self.name+".gif"
+        self.xDim = 720
+        self.yDim = 720
+        self.landColor = self.myMap.biomeColors[self.node.biome]
+        self.streetColor = (16,128,76)
+        cnt = 255
+        sd = (self.node.x*73)+(self.node.y*37)
+        random.seed(sd)
+        verts = [[random.randint(0,self.xDim),random.randint(0,self.yDim)] for i in range(cnt)]
+        verts.append([self.xDim/2,self.yDim/2])
+        verts = np.asarray(verts)
+        primVor = Voronoi(verts)
+        self.streetNodes = [StreetNode(i) for i in primVor.vertices]
+        self.blocks = [Block(self) for i in primVor.regions]
+        for i in range(len(self.blocks)):
+            b = self.blocks[i]
+            for j in range(len(primVor.regions[i])):
+                index = primVor.regions[i][j]
+                if index >= 0:
+                    b.verts.append(self.streetNodes[index])
+        self.streets = []
+        for i in range(len(primVor.ridge_vertices)):
+            in0 = primVor.ridge_vertices[i][0]
+            in1 = primVor.ridge_vertices[i][1]
+            newStreet = Street(self.streetNodes[in0],self.streetNodes[in1],4)
+            self.streets.append(newStreet)
         self.population = self.node.city.population
-        self.maxHexSize = 16
-        p = 0
-        self.hexes = []
-        self.edges = []
-        while p < clamp(math.log2(self.population)-4,2,self.maxHexSize):
-            newHex = TownHex(p,self,hexid=p)
-            self.hexes.append(newHex)
-            p+=1
+        self.radius = 32+(math.sqrt(self.population)*3)
+        self.x = self.xDim/2
+        self.y = self.yDim/2
+        self.neighborPts = []
+        for n in self.node.neighbors:
+            d = n.dist(self.node)
+            scl = self.xDim/d
+            dx = (n.x-self.node.x)*scl
+            dy = (n.y-self.node.y)*scl
+            xx = clamp(self.x + dx,0,self.xDim)
+            yy = clamp(self.y + dy,0,self.yDim)
+            s = StreetNode([xx,yy])
+            if n.river != None:
+                s.type = "river"
+            if n.bodyWater != None:
+                s.type = "water"
+                self.radius *= 1.2
+            self.neighborPts.append(s)
+        for p in self.neighborPts:
+            if p.type == "river":
+                if self.node.river != None:
+                    self.buildRiver(p,self.nearestBlock(self.x,self.y))
+            if p.type == "water":
+                for k in range(len(self.blocks)):
+                    kk = self.blocks[k].centroid()
+                    if (self.blocks[k].blockDist(p.x,p.y) < self.x):
+                        self.blocks[k].type = "water"
+        self.outskirts = []
+        for k in range(len(self.blocks)):
+            if (self.blocks[k].blockDist(self.x,self.y) > self.radius
+                or self.blocks[k].type == "water"):
+                self.outskirts.append(self.blocks[k])
+        self.cullStreets(0)
+        for i in self.blocks:
+            if i not in self.outskirts:
+                i.subdivide(1600)
+    def nearestBlock(self,xx,yy):
+        d = self.xDim
+        a = self.blocks[0]
+        for k in self.blocks:
+            dd = k.blockDist(xx,yy)
+            if dd < d:
+                d = dd
+                a = k
+        return a
+    def buildRiver(self,n0,b1):
+        curr = self.nearestBlock(n0.x,n0.y)
+        bx = b1.centroid()[0]
+        by = b1.centroid()[1]
+        while curr != b1:
+            curr.type = "water"
+            t = curr
+            d = self.xDim
+            for f in self.blocks:
+                if (curr.sharedNeighbors(f) >= 2 and f != curr
+                and f.blockDist(bx,by) < d):
+                    d = f.blockDist(bx,by)
+                    t = f
+            if t == curr:
+                return -1
+            else:
+                curr = t
+    def cullStreets(self,l):
+        for k in self.streets:
+            k.exists = 0
+            q = 0
+            f = 0
+            for b in self.blocks:
+                if b not in self.outskirts:
+                    if k.nodes[0] in b.verts:
+                        q = 1
+                    if k.nodes[1] in b.verts:
+                        f = 1
+            if q == 1 and f == 1:
+                k.exists = 1
+            if k.length() < l:
+                k.cull()
     def drawSelf(self,drawer):
-        for e in self.edges:
-            e.drawSelf(drawer)
+        drawer.rectangle([(0,0),(self.xDim,self.yDim)],self.landColor,self.landColor)
+        for k in self.blocks:
+            if k not in self.outskirts:
+                k.drawSelf(drawer)
+            elif k.type == "water":
+                k.drawSelf(drawer)
+        for s in self.streets:
+            if s.exists == 1:
+                s.drawSelf(drawer,self.streetColor)
+        scl = 8
+        h = self.yDim/scl
+        w = self.xDim/scl
+        dCol = (0,0,0)
+        drawer.rectangle([(0,0),(self.xDim,h)],dCol,dCol)
+        drawer.rectangle([(0,0),(w,self.yDim)],dCol,dCol)
+        drawer.rectangle([(self.xDim-w,0),(self.xDim,self.yDim)],dCol,dCol)
+        drawer.rectangle([(0,self.yDim-h),(self.xDim,self.yDim)],dCol,dCol)
