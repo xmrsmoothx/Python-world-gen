@@ -1413,19 +1413,21 @@ class Culture:
                 if len(self.deities) >= 2:
                     mm = 2
                 if random.random() < (0.43 + (k*0.1)):
-                    parents = random.randint(1,mm)
+                    parent = random.randint(1,mm)
                 else:
-                    parents = 0
+                    parent = 0
                 age = round(ageOf/(len(self.deities)*rr))
                 nom = self.language.genName()
                 if random.random() < (0.25 + (k*0.1)):
                     nom += " " + self.language.genName()
                 ent = Population(self,n=nom,t=titles[k],a=age,kind="deity")
-                for u in range(parents):
+                ent.kids = []
+                for u in range(parent):
                     pp = random.choice(self.deities)
                     while pp in ent.parents:
                         pp = random.choice(self.deities)
                     ent.parents.append(pp)
+                    pp.kids.append(ent)
                 ent.associate()
                 self.deities.append(ent)
     def shortName(self):
@@ -1477,10 +1479,12 @@ class Culture:
         s += "Capital: " + self.origin.city.name + "\n\n"
         return s
 
-# This doesn't strictly represent a Population, just any sort of significant/named entity in the world.
-
+# This doesn't strictly represent a "population" as such, 
+# just any sort of significant/named entity in the universe.
 class Population:
     def __init__(self,c,n=None,t="",a=None,p=1,kind="person"):
+        self.parents = []
+        self.kids = []
         self.culture = c
         self.number = p
         if n == None or n in self.culture.populations.keys():
@@ -1499,8 +1503,8 @@ class Population:
         self.title = t + " "
         self.fullName = self.nameFull()
         self.culture.populations[self.name] = self
-        self.parents = []
         self.pronouns = ["he","it","she"]
+        self.possessive = ["his","its","her"]
         self.gender = random.choice([-1,0,1])
         self.description = ""
         self.kind = kind
@@ -1514,9 +1518,43 @@ class Population:
         s += " a " + str(self.age) + "-year-old "
         if self.kind == "deity":
             s += "deity of "
-            s += self.associations[0]
+            s += self.associations[0] 
+        if self.kind == "person":
+            s += "person from the "
+            s += self.culture.name + " culture"
         s += ".\n"
+        if len(self.parents) == 0:
+            s += " "
+        elif len(self.parents) == 1:
+            s += self.possessive[self.gender].capitalize() + " parent is"
+            s += " the " + self.parents[0].nameFull()
+            s += ".\n"
+        else:
+            s += self.possessive[self.gender].capitalize() + " parents are"
+            s += " the " + self.parents[0].nameFull()
+            s += " and"
+            s += " the " + self.parents[1].nameFull()
+            s += ".\n"
+        if len(self.kids) == 0:
+            s += " "
+        elif len(self.kids) == 1:
+            s += self.possessive[self.gender].capitalize() + " child is"
+            s += " the " + self.kids[0].nameFull()
+            s += ".\n"
+        else:
+            s += self.possessive[self.gender].capitalize() + " children are:\n"
+            s += "The " + self.kids[0].nameFull()
+            qq = len(self.kids)-1
+            for i in range(qq):
+                cc = self.kids[i+1]
+                if i+1 != qq:
+                    s += ",\n the "
+                else:
+                    s += ",\n and the "
+                s += cc.nameFull()
+            s += ".\n"
         self.description = s
+        return s
     def addPop(self,p):
         self.age = 0
         for g in range(self.number):
@@ -1536,7 +1574,10 @@ class Population:
             s += " " + self.name[1]
         return s
     def nameFull(self):
-        s = self.title + self.name[0]
+        if self.title != "":
+            s = self.title + self.name[0]
+        else:
+            s = self.kind + " " + self.name[0]
         if self.name[1] != "":
             s += " " + self.name[1]
         return s
@@ -1545,7 +1586,7 @@ class Population:
         s += self.nameFull()
         s += " is a " + self.kind
         s += " of the society of " + self.culture.name + ".\n\n"
-        s += self.description
+        s += self.descrip()
         return s
 
 class Flag:
