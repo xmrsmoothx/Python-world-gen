@@ -8,8 +8,9 @@ Created on Fri Dec  8 22:47:38 2017
 import numpy as np
 import random
 import math
-from tkinter import *
-from PIL import Image, ImageDraw, ImageTk
+
+from scipy.spatial import Voronoi
+
 from src_towngen import *
 
 def synonym(x,seed=0):
@@ -54,23 +55,6 @@ def lengthDirY(length, angle):
 def A(dx, dy):
   return math.degrees( math.atan2(dy, dx) )
 
-def drawCircle(drawer,x,y,radius,color):
-    x1 = x-radius
-    x2 = x+radius
-    y1 = y-radius
-    y2 = y+radius
-    drawer.ellipse([(x1,y1),(x2,y2)],color)
-
-def drawTrapezoid(drawer,x1,y1,x2,y2,r1,r2,color):
-    directAngle = A(x2-x1,y2-y1)
-    pAngle = directAngle-90
-    pAngle2 = pAngle-180
-    p1 = (x1+lengthDirX(r1,pAngle),y1+lengthDirY(r1,pAngle))
-    p2 = (x1+lengthDirX(r1,pAngle2),y1+lengthDirY(r1,pAngle2))
-    p3 = (x2+lengthDirX(r2,pAngle2),y2+lengthDirY(r2,pAngle2))
-    p4 = (x2+lengthDirX(r2,pAngle),y2+lengthDirY(r2,pAngle))
-    drawer.polygon([p1,p2,p3,p4],color,color)
-    
 def centroidnp(arr):
     length = arr.shape[0]
     sum_x = np.sum(arr[:, 0])
@@ -103,7 +87,7 @@ def strDivider(length):
         n += "_"
     return n
             
-from scipy.spatial import Voronoi
+
 def relaxLloyd(pts,strength):
     for i in range(strength):
         vor = Voronoi(pts)
@@ -541,8 +525,10 @@ class bodyWater:
             p.bodyWater = self
     def fill(self):
         for p in self.nodes:
+            print("p",p)
             for k in p.neighbors:
-                while k not in self.nodes and k.elevation < self.sealevel:
+                print("k",k)
+                if k not in self.nodes and k.elevation < self.sealevel:
                     self.addNode(k)
 
 class Landmass:
@@ -597,8 +583,12 @@ class Landmass:
                 while k not in self.nodes and k.elevation >= self.sealevel:
                     self.addNode(k)
     def addRiver(self,length):
+        print(self.boundary)
+        print(math.floor(random.random()))
+        print(len(self.boundary)-1)
         root = self.boundary[math.floor(random.random()*(len(self.boundary)-1))]
-        riverLen = random.randint(length/4,length)
+        print(length)
+        riverLen = random.randint(round(length/4),round(length))
         newRiver = River(root,riverLen,self)
         self.rivers.append(newRiver)
     def cullStreams(self,minLen):
@@ -969,13 +959,7 @@ class City:
             self.drawTown(drawer,self.node.x,self.node.y,col,out)
         elif self.population <= 20000:
             self.drawCity(drawer,self.node.x,self.node.y,col,out)
-    def drawTownGen(self):
-        self.townGen = Town(self.node,self.myMap,self.name)
-        townImg = Image.new("HSV",(self.townGen.xDim,self.townGen.yDim),(0,0,255))
-        graphDraw = ImageDraw.Draw(townImg)
-        self.townGen.drawSelf(graphDraw)
-        townImg = townImg.convert("RGB")
-        townImg.save(self.townGen.mapName,"GIF")
+    
     def cityNotes(self):
         s = self.name + "\n\n"
         s += self.cType(self.population) + "\n\n"
@@ -1554,6 +1538,7 @@ class Flag:
         self.xDim = 384
         self.yDim = 192
         self.colors = []
+        self.shapes = []
         self.newColor()
         self.genFlag()
     def newColor(self):
@@ -1568,42 +1553,43 @@ class Flag:
         return pt
     def center(self):
         return (self.xDim/2,self.yDim/2)
-    def addTri(self,drawer):
+        
+    def addTri(self):
         col = self.newColor()
         p0 = random.choice(self.corners)
         p1 = random.choice([(abs(self.xDim-p0[0]),p0[1]),(p0[0],abs(self.yDim-p0[1]))])
         p2 = random.choice([self.center(),random.choice(self.corners)])
-        drawer.polygon([p0,p1,p2],fill=col,outline=col)
-    def addRect(self,drawer):
+        self.shapes.append(("tri",[p0,p1,p2],{"fill":col,"outline":col}))
+        #drawer.polygon()
+    def addRect(self):
         col = self.newColor()
         p0 = random.choice([(random.randint(0,self.xDim),random.choice([0,self.yDim,self.yDim/2])),
               (random.choice([0,self.xDim,self.xDim/2]),random.randint(0,self.yDim))])
         p1 = random.choice(self.corners)
-        drawer.rectangle([p0,p1],fill=col,outline=col)
-    def addCirc(self,drawer):
+        self.shapes.append(("rect",[p0,p1],{"fill":col,"outline":col}))
+        #drawer.rectangle([p0,p1],fill=col,outline=col)
+        
+    def addCirc(self):
         col = self.newColor()
         p0 = random.choice([(random.randint(0,self.xDim),random.choice([0,self.yDim,self.yDim/2])),
               (random.choice([0,self.xDim,self.xDim/2]),random.randint(0,self.yDim))])
         rad = random.randint(1,self.yDim)
-        drawCircle(drawer,p0[0],p0[1],rad,col)
+        self.shapes.append(("circ",(p0[0],p0[1],rad,col)))
+        #drawCircle(drawer,p0[0],p0[1],rad,col)
+        
     def genFlag(self):
-        img = Image.new('HSV',(self.xDim,self.yDim),self.colors[0])
-        drawer = ImageDraw.Draw(img)
         numElements = random.randint(1,4)
         self.corners = [(0,0),(self.xDim,0),(self.xDim,self.yDim),(0,self.yDim)]
         for i in range(numElements):
             element = random.choice(["tri","rect","circ"])
             if element == "tri":
-                self.addTri(drawer)
+                self.addTri()
             if element == "rect":
-                self.addRect(drawer)
+                self.addRect()
             if element == "circ":
-                self.addCirc(drawer)
-        drawer.line(self.corners+[(0,0)],fill=(0,0,0),width=8)
-        self.filename = "flag_" + self.culture.name + ".gif"
-        img = img.convert('RGB')
-        img.save(self.filename,"GIF")
-
+                self.addCirc()
+        
+        
 class Language:
     def __init__(self,c):
         self.culture = c
@@ -1903,11 +1889,13 @@ class Map:
             if landmass.size > length*8:
                 c = 100000000
             c += 1
-        landmass.addRiver(length)
+            landmass.addRiver(length)
     def addMinorRiver(self,count):
+        return
         for i in range(count):
             self.addRiver(self.n/512)
     def addMajorRiver(self,count):
+        return
         for i in range(count):
             self.addRiver(self.n/128)
     def cullStreams(self):
@@ -2426,45 +2414,8 @@ class Map:
             k.defaultRoads()
         for i in range(n):
             self.randomCity()
-    def drawGraph(self,gui=None):
-        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
-        graphDraw = ImageDraw.Draw(visualAtlas)
-        for tri in self.triangles:
-            tri.drawGraph(graphDraw)
-        for n in self.atlas:
-            n.drawPoint(graphDraw,1,"red")
-        visualAtlas.show()
-    def drawElevation(self,pts=0,sea=1,gui=None):
-        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
-        graphDraw = ImageDraw.Draw(visualAtlas)
-        for tri in self.triangles:
-            tri.drawElevation(graphDraw,self.sealevel*sea)
-        for n in self.atlas:
-            n.drawElevation(graphDraw)
-        for l in self.landmasses:
-            for r in l.rivers:
-                r.drawRiver(graphDraw)
-        visualAtlas.show()
-    def drawLandmass(self,pts=0,nbrs=0,gui=None):
-        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
-        graphDraw = ImageDraw.Draw(visualAtlas)
-        for tri in self.triangles:
-            tri.drawLandmass(graphDraw,self.sealevel)
-        for n in self.atlas:
-            n.drawLandmass(graphDraw,pts,nbrs)
-        for l in self.landmasses:
-            for r in l.rivers:
-                r.drawPath(graphDraw)
-        visualAtlas.show()
-    def drawWildlife(self,gui=None):
-        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
-        graphDraw = ImageDraw.Draw(visualAtlas)
-        for tri in self.triangles:
-            tri.drawWildlife(graphDraw,self.sealevel)
-        for l in self.landmasses:
-            for r in l.rivers:
-                r.drawRiver(graphDraw,self.xDim)
-        visualAtlas.show()
+    
+        
     def displayNode(self,event):
         clickedNode = self.nearestNode(event.x,event.y)
         self.displayString.set(self.nodeInfo(clickedNode))
@@ -2473,35 +2424,6 @@ class Map:
         if cityNode.node.dist(Node(event.x,event.y)) < 8:
             self.displayString.set(self.nodeInfo(cityNode.node))
             self.displayNo = cityNode.node
-    def redraw(self):
-        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
-        graphDraw = ImageDraw.Draw(visualAtlas)
-        if self.viewmode == 0:
-            for tri in self.triangles:
-                tri.drawReal(graphDraw,self.sealevel)
-            for n in self.atlas:
-                n.drawReal(graphDraw,self.sealevel)
-            for l in self.landmasses:
-                for r in l.rivers:
-                    r.drawRiver(graphDraw,self.xDim)
-            for c in self.cities:
-                c.drawSelf(graphDraw)
-        elif self.viewmode == 1:
-            for tri in self.triangles:
-                tri.drawTerritory(graphDraw,self.sealevel)
-            for l in self.landmasses:
-                for r in l.rivers:
-                    r.drawRiver(graphDraw,self.xDim)
-            for c in self.cities:
-                c.drawSelf(graphDraw)
-        visualAtlas = visualAtlas.convert("RGB")
-        visualAtlas.save(self.mapname,"GIF")
-        photo = Image.open(self.mapname)
-        self.img = ImageTk.PhotoImage(photo)
-        self.lbl.configure(image = self.img)
-        self.lbl.image = self.img
-        if self.displayNo != None:
-            self.displayString.set(self.nodeInfo(self.displayNo))
     def updateTiming(self):
         self.date += self.timeScale
     def updateResources(self):
@@ -2545,29 +2467,8 @@ class Map:
         b1.pack(anchor=S,side=RIGHT)
         c1 = "medium aquamarine"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-    def cultureInfo(self):
-        if self.displayNo == None:
-            return -1
-        if self.displayNo.culture == None:
-            return -1
-        self.displayCulture = self.displayNo.culture
-        if self.infoGui != None:
-            self.infoGui.destroy()
-        self.infoGui = Toplevel()
-        photo = Image.open(self.displayCulture.flag.filename)
-        self.flagImg = ImageTk.PhotoImage(photo)
-        self.flagLbl = Label(self.infoGui,image=self.flagImg)
-        self.flagLbl.config(borderwidth=32)
-        self.flagLbl.photo = photo
-        self.flagLbl.pack()
-        self.cultureString = StringVar()
-        self.cultureString.set(self.displayCulture.cultureNotes())
-        cdsc = Label(self.infoGui,textvariable=self.cultureString)
-        cdsc.pack()
-        b1 = Button(self.infoGui,text="Mythology Info",command=self.mythologyInfo)
-        b1.pack(anchor=S,side=RIGHT)
-        c1 = "light goldenrod"
-        b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+    
+        
     def mythologyInfo(self):
         if self.displayCulture == None:
             return -1
@@ -2586,163 +2487,12 @@ class Map:
             b1.pack(anchor=S,expand=1,side=TOP)
             c1 = "SteelBlue4"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-    def cityInfo(self):
-        if self.displayNo == None:
-            return -1
-        if self.displayNo.city == None:
-            return -1
-        self.displayCity = self.displayNo.city
-        if self.infoGui != None:
-            self.infoGui.destroy()
-        self.infoGui = Toplevel()
-        self.displayCity.drawTownGen()
-        photo = Image.open(self.displayCity.townGen.mapName)
-        self.townImg = ImageTk.PhotoImage(photo)
-        self.townLbl = Label(self.infoGui,image=self.townImg)
-        self.townLbl.config(borderwidth=2)
-        self.townLbl.photo = photo
-        self.townLbl.pack()
-        self.cityString = StringVar()
-        self.cityString.set(self.displayCity.cityNotes())
-        cdsc = Label(self.infoGui,textvariable=self.cityString)
-        cdsc.pack()
-        self.displayCulture = self.displayNo.culture
-        b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
-        b1.pack(anchor=S,side=RIGHT)
-        c1 = "medium aquamarine"
-        b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+            
     def changeView(self):
         if self.viewmode == 1:
             self.viewmode = 0
         else:
             self.viewmode += 1
         self.redraw()
-    def drawReal(self,gui=None):
-        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
-        graphDraw = ImageDraw.Draw(visualAtlas)
-        for tri in self.triangles:
-            tri.drawReal(graphDraw,self.sealevel)
-        for n in self.atlas:
-            n.drawReal(graphDraw,self.sealevel)
-        for l in self.landmasses:
-            for r in l.rivers:
-                r.drawRiver(graphDraw,self.xDim)
-        for c in self.cities:
-            c.drawSelf(graphDraw)
-        if gui == None:
-            visualAtlas = visualAtlas.convert("RGB")
-            visualAtlas.save("map00.png","PNG")
-            visualAtlas.show()
-        else:
-            self.gui = gui
-            self.displayString = StringVar()
-            self.displayString.set("No node selected")
-            self.infoScales()
-            desc = Label(gui,textvariable=self.displayString)
-            desc.pack(side=RIGHT)
-            visualAtlas = visualAtlas.convert("RGB")
-            self.mapname = "map_" + self.cultures[0].language.genName() + ".gif"
-            visualAtlas.save(self.mapname,"GIF")
-            photo = Image.open(self.mapname)
-            self.img = ImageTk.PhotoImage(photo)
-            self.lbl = Label(gui,image=self.img)
-            self.lbl.pack()
-            self.lbl.bind("<Button-1>",self.displayNode)
-            b0 = Button(gui,text="Next Turn",command=self.nextTurn)
-            b0.pack(anchor=S,side=RIGHT)
-            c1 = "orange red"
-            b0.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b1 = Button(gui,text="Society Info",command=self.cultureInfo)
-            b1.pack(anchor=S,side=RIGHT)
-            c1 = "medium aquamarine"
-            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b3 = Button(gui,text="Settlement Info",command=self.cityInfo)
-            b3.pack(anchor=S,side=RIGHT)
-            c1 = "aquamarine"
-            b3.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b2 = Button(gui,text="Change Mode",command=self.changeView)
-            b2.pack(anchor=S,side=RIGHT)
-            c1 = "sandy brown"
-            b2.config(bg=c1,activebackground=c1,activeforeground=c1)
-            gui.mainloop()
+        
 
-#----------------------------------------------------------------------#            
-# Let's generate a map
-
-numNodes = 2**14
-mapDimX = 960
-mapDimY = 960
-atlas = [Node(-1,-1),Node(mapDimX+1,-1),Node(mapDimY+1,mapDimY+1),Node(-1,mapDimY+1)]
-world = Map(atlas,numNodes,mapDimX,mapDimY)
-
-print("Generating points...")
-for x in range(numNodes-4):
-    nodeX = random.random()*mapDimX
-    nodeY = random.random()*mapDimY
-    newNode = Node(nodeX,nodeY)
-    atlas.append(newNode)
-
-npFloatAtlas = np.zeros((numNodes,2))
-for q in range(len(atlas)):
-    nodeX = atlas[q].x
-    nodeY = atlas[q].y
-    npFloatAtlas[q] = [nodeX,nodeY]
-
-print("Triangulating...")
-from scipy.spatial import Delaunay
-triangulation = Delaunay(npFloatAtlas)
-
-trisList = triangulation.vertices
-trisVerts = triangulation.points
-print("Relaxing points...")
-relaxLloyd(npFloatAtlas,1)
-for q in range(len(npFloatAtlas)):
-    nodeX = npFloatAtlas[q,0]
-    nodeY = npFloatAtlas[q,1]
-    atlas[q].x = nodeX
-    atlas[q].y = nodeY
-
-triangles = []
-triIndex = 0
-print("Building triangles...")
-while triIndex < len(trisList):
-    triVertsIndices = trisList[triIndex]
-    newTri = Triangle(atlas[triVertsIndices[0]],atlas[triVertsIndices[1]],atlas[triVertsIndices[2]])
-    triangles.append(newTri)
-    triIndex += 1
-
-print("Assigning neighbors...")
-for tri in triangles:
-    if tri.verts[0].isLinked(tri.verts[1]) == 0:
-        tri.verts[0].link(tri.verts[1])
-    if tri.verts[1].isLinked(tri.verts[2]) == 0:
-        tri.verts[1].link(tri.verts[2])
-    if tri.verts[2].isLinked(tri.verts[0]) == 0:
-        tri.verts[2].link(tri.verts[0])
-
-world.triangles = triangles
-
-print("Generating terrain...")
-world.perlinElevation(6)
-world.elevationAdd(-0.35)
-world.addRandomShape()
-world.setSeaLevel(0.4)
-world.cullDots()
-world.clampElevation()
-world.buildAllLand()
-world.buildAllWater()
-world.addMajorRiver(12)
-world.addMinorRiver(12)
-world.cullStreams()
-world.soilProperties()
-print("Defining biomes...")
-world.setBiomes()
-world.buildRegions()
-world.setWildlife()
-world.influences()
-world.values()
-world.godSpheres()
-world.scatterCities(16)
-print("Drawing map...")
-root = Tk()
-world.drawReal(root)
