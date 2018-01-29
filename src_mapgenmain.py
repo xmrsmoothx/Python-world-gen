@@ -11,6 +11,7 @@ import math
 from tkinter import *
 from PIL import Image, ImageDraw, ImageTk
 from src_towngen import *
+from src_events import *
 
 def synonym(x,seed=0):
     s = {}
@@ -23,6 +24,21 @@ def synonym(x,seed=0):
     s["frost tundra"] = ["frost tundra","arctic","alpines","frozen tundra"]
     s["tropical forest"] = ["tropical forest","jungle"]
     s["boreal forest"] = ["boreal forest","woods","wood","taiga"]
+    s["carnivores"] = ["carnivores","predators"]
+    s["herbivores"] = ["herbivores","livestock"]
+    s["fear"] = ["fear","terror"]
+    s["warriors"] = ["warriors","fighters","soldiers"]
+    s["agriculture"] = ["agriculture","farming","irrigation"]
+    s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
+    s["village"] = ["village","hamlet"]
+    s["township"] = ["township","settlement"]
+    s["plantlife"] = ["plantlife","plants","vegetation","flora"]
+    s["vegetation"] = ["plantlife","plants","vegetation","flora"]
+    s["fields"] = ["fields","farms","pastures"]
+    s["metallicity"] = ["metallicity","metals","ore"]
+    s["fertility"] = ["fertility","plenty","abundance"]
+    s["darkness"] = ["darkness","night","twilight","dusk"]
+    s["death"] = ["death","mortality"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)
@@ -673,13 +689,16 @@ class Influence:
         inf = "elevation"
         self.setOutput(inf,strength)
         strength = self.node.slope
-        inf = "slope"
+        inf = "hills"
         self.setOutput(inf,strength)
         strength = self.node.vegetation
         inf = "vegetation"
         self.setOutput(inf,strength)
         strength = self.node.metallicity
         inf = "metallicity"
+        self.setOutput(inf,strength)
+        strength = self.node.fertility
+        inf = "fertility"
         self.setOutput(inf,strength)
         
 class Values:
@@ -837,11 +856,11 @@ class City:
             self.age = 0
     def cType(self,p):
         if p <= 35:
-            c = random.choice(["bivouac","camp","camp","encampment","campsite"])
+            c = synonym("camp")
         elif p <= 200:
-            c = "village"
+            c = synonym("village")
         elif p <= 1000:
-            c = "township"
+            c = synonym("township")
         elif p <= 5000:
             c = "town"
         elif p <= 20000:
@@ -1143,6 +1162,8 @@ class Culture:
     def updatePops(self):
         for f in self.populations.keys():
             self.populations[f].agePop(self.myMap.timeScale)
+        for d in self.deities:
+            d.agePop(self.myMap.timeScale)
     def setSociety(self):
         m = self.value.mainValues
         if "warriors" in m and "collectivists" in m and "worshippers" in m:
@@ -1337,19 +1358,19 @@ class Culture:
     def generateMythology(self):
         self.deities = []
         m = self.value.mainValues
-        tiers = 3
+        tiers = 4
         maxtiers = 6
         if "superstition" in m:
-            t = random.randint(1,2)
+            t = random.randint(1,3)
             tiers += t
         if "astrology" in m:
             t = random.randint(0,1)
             tiers += t
         if "worshippers" in m:
-            t = 1
+            t = random.randint(1,2)
             tiers += t
         if "shamans" in m:
-            t = random.randint(0,2)
+            t = random.randint(1,2)
             tiers += t
         if "naturalists" in m:
             t = random.randint(0,1)
@@ -1401,13 +1422,17 @@ class Culture:
         aa = random.random()*16
         ageOf = round(self.myMap.age*aa/4)
         rr = random.randint(1,32)
-        self.deities.append(Population(self,n=self.language.genName(),t=titles[0],a=ageOf,kind="location"))
+        f = Population(self,n=self.language.genName(),t=titles[0],a=ageOf,kind="location")
+        f.gender = 0
+        e = Event(self.myMap,ageOf,"genesis",f,[])
+        e.importance = 100
+        self.deities.append(f)
         for k in range(clamp(maxtiers-tiers,1,maxtiers),tiers):
             entities = math.ceil((random.randint(0,2)+k)/2)
             if random.random() < 0.3:
                 entities = 0
             if random.random() < 0.25:
-                entities = random.randint(6,8)
+                entities = random.randint(5,7)
             for e in range(entities):
                 mm = 1
                 if len(self.deities) >= 2:
@@ -1430,6 +1455,7 @@ class Culture:
                     pp.kids.append(ent)
                 ent.associate()
                 self.deities.append(ent)
+                e = Event(self.myMap,age,"birth",ent,ent.parents)
     def shortName(self):
         name = ""
         name += self.name + " " + self.title
@@ -1503,9 +1529,9 @@ class Population:
         self.title = t + " "
         self.fullName = self.nameFull()
         self.culture.populations[self.name] = self
-        self.pronouns = ["he","it","she"]
-        self.possessive = ["his","its","her"]
-        self.gender = random.choice([-1,0,1])
+        self.pronouns = ["it","he","she"]
+        self.possessive = ["its","his","her"]
+        self.gender = random.choice([0,1,2])
         self.description = ""
         self.kind = kind
         self.associations = []
@@ -1518,9 +1544,14 @@ class Population:
         s += " a " + str(self.age) + "-year-old "
         if self.kind == "deity":
             s += "deity of "
-            s += self.associations[0] 
+            s += synonym(self.associations[0],seedNum(self.name[0]))
+            if self.associations[0] == "mountain":
+                s += "s"
         if self.kind == "person":
             s += "person from the "
+            s += self.culture.name + " culture"
+        if self.kind == "location":
+            s += "location of the "
             s += self.culture.name + " culture"
         s += ".\n"
         if len(self.parents) == 0:
@@ -1722,6 +1753,7 @@ class Map:
         self.regions = []
         self.cities = []
         self.cultures = []
+        self.events = []
         self.resourceRegions = []
         self.resourceScale = 1
         self.sealevel = 0.4
@@ -2295,7 +2327,7 @@ class Map:
                        "fear":0.05,
                        "movement":0.4,
                        "death":0.1}
-        self.influences["slope"] = {"sky":0.1,
+        self.influences["hills"] = {"sky":0.1,
                        "sunlight":0.1,
                        "earth":0.1,
                        "fear":0.05,
@@ -2545,6 +2577,7 @@ class Map:
             self.displayString.set(self.nodeInfo(self.displayNo))
     def updateTiming(self):
         self.date += self.timeScale
+        self.age += self.timeScale
     def updateResources(self):
         self.setBiomes()
         for r in self.resourceRegions:
@@ -2564,11 +2597,15 @@ class Map:
     def updatePops(self):
         for c in self.cultures:
             c.updatePops()
+    def updateEvents(self):
+        for e in self.events:
+            e.ageEvent()
     def nextTurn(self):
         self.updateTiming()
         self.updateResources()
         self.updateDemogs()
         self.updatePops()
+        self.updateEvents()
         self.updateTerritory()
         self.redraw()
     def popInfo(self,p=None):
@@ -2580,12 +2617,31 @@ class Map:
         self.popString = StringVar()
         self.popString.set(p.popNotes())
         pdsc = Label(self.infoGui,textvariable=self.popString)
-        pdsc.pack()
+        pdsc.pack(anchor=W,side=RIGHT)
         self.displayCulture = p.culture
         b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
-        b1.pack(anchor=S,side=RIGHT)
+        b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
         c1 = "medium aquamarine"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        if p.kind == "deity":
+            b1 = Button(self.infoGui,text="Mythology Info",command=self.mythologyInfo)
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "light goldenrod"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        for g in p.parents:
+            s = " "+g.justName()+" (Parent) "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = g: self.popInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SteelBlue3"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        for g in p.kids:
+            s = " "+g.justName()+" (Child) "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = g: self.popInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SteelBlue4"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def cultureInfo(self):
         if self.displayNo == None:
             return -1
@@ -2621,10 +2677,10 @@ class Map:
         mdsc.config(justify=LEFT)
         mdsc.pack(anchor=W,side=RIGHT)
         for i in range(len(self.displayCulture.deities)):
-            s = " ["+str(i)+"] "
+            s = " "+self.displayCulture.deities[i].justName()+" "
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = self.displayCulture.deities[i]: self.popInfo(d))
-            b1.pack(anchor=S,expand=1,side=TOP)
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "SteelBlue4"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def cityInfo(self):
@@ -2680,29 +2736,29 @@ class Map:
             self.displayString.set("No node selected")
             self.infoScales()
             desc = Label(gui,textvariable=self.displayString)
-            desc.pack(side=RIGHT)
+            desc.pack(anchor=W,side=RIGHT)
             visualAtlas = visualAtlas.convert("RGB")
             self.mapname = "map_" + self.cultures[0].language.genName() + ".gif"
             visualAtlas.save(self.mapname,"GIF")
             photo = Image.open(self.mapname)
             self.img = ImageTk.PhotoImage(photo)
             self.lbl = Label(gui,image=self.img)
-            self.lbl.pack()
+            self.lbl.pack(anchor=E,side=LEFT)
             self.lbl.bind("<Button-1>",self.displayNode)
             b0 = Button(gui,text="Next Turn",command=self.nextTurn)
-            b0.pack(anchor=S,side=RIGHT)
+            b0.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "orange red"
             b0.config(bg=c1,activebackground=c1,activeforeground=c1)
             b1 = Button(gui,text="Society Info",command=self.cultureInfo)
-            b1.pack(anchor=S,side=RIGHT)
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "medium aquamarine"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
             b3 = Button(gui,text="Settlement Info",command=self.cityInfo)
-            b3.pack(anchor=S,side=RIGHT)
+            b3.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "aquamarine"
             b3.config(bg=c1,activebackground=c1,activeforeground=c1)
             b2 = Button(gui,text="Change Mode",command=self.changeView)
-            b2.pack(anchor=S,side=RIGHT)
+            b2.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "sandy brown"
             b2.config(bg=c1,activebackground=c1,activeforeground=c1)
             gui.mainloop()
