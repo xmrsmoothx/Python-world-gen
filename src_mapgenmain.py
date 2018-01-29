@@ -2545,10 +2545,7 @@ class Map:
         b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
         c1 = "medium aquamarine"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-<<<<<<< HEAD
-    
-        
-=======
+
         if p.kind == "deity":
             b1 = Button(self.infoGui,text="Mythology Info",command=self.mythologyInfo)
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
@@ -2591,7 +2588,7 @@ class Map:
         b1.pack(anchor=S,side=RIGHT)
         c1 = "light goldenrod"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
->>>>>>> 037c00d9e2123e90a78c04eb86b7ed6f385a20b6
+
     def mythologyInfo(self):
         if self.displayCulture == None:
             return -1
@@ -2617,112 +2614,5 @@ class Map:
         else:
             self.viewmode += 1
         self.redraw()
-<<<<<<< HEAD
-        
-=======
-    def drawReal(self,gui=None):
-        visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
-        graphDraw = ImageDraw.Draw(visualAtlas)
-        for tri in self.triangles:
-            tri.drawReal(graphDraw,self.sealevel)
-        for n in self.atlas:
-            n.drawReal(graphDraw,self.sealevel)
-        for l in self.landmasses:
-            for r in l.rivers:
-                r.drawRiver(graphDraw,self.xDim)
-        for c in self.cities:
-            c.drawSelf(graphDraw)
-        if gui == None:
-            visualAtlas = visualAtlas.convert("RGB")
-            visualAtlas.save("map00.png","PNG")
-            visualAtlas.show()
-        else:
-            self.gui = gui
-            self.displayString = StringVar()
-            self.displayString.set("No node selected")
-            self.infoScales()
-            desc = Label(gui,textvariable=self.displayString)
-            desc.pack(anchor=W,side=RIGHT)
-            visualAtlas = visualAtlas.convert("RGB")
-            self.mapname = "map_" + self.cultures[0].language.genName() + ".gif"
-            visualAtlas.save(self.mapname,"GIF")
-            photo = Image.open(self.mapname)
-            self.img = ImageTk.PhotoImage(photo)
-            self.lbl = Label(gui,image=self.img)
-            self.lbl.pack(anchor=E,side=LEFT)
-            self.lbl.bind("<Button-1>",self.displayNode)
-            b0 = Button(gui,text="Next Turn",command=self.nextTurn)
-            b0.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "orange red"
-            b0.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b1 = Button(gui,text="Society Info",command=self.cultureInfo)
-            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "medium aquamarine"
-            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b3 = Button(gui,text="Settlement Info",command=self.cityInfo)
-            b3.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "aquamarine"
-            b3.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b2 = Button(gui,text="Change Mode",command=self.changeView)
-            b2.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "sandy brown"
-            b2.config(bg=c1,activebackground=c1,activeforeground=c1)
-            gui.mainloop()
 
-#----------------------------------------------------------------------#            
-# Let's generate a map
-
-numNodes = 2**14
-mapDimX = 960
-mapDimY = 960
-atlas = [Node(-1,-1),Node(mapDimX+1,-1),Node(mapDimY+1,mapDimY+1),Node(-1,mapDimY+1)]
-world = Map(atlas,numNodes,mapDimX,mapDimY)
-
-print("Generating points...")
-for x in range(numNodes-4):
-    nodeX = random.random()*mapDimX
-    nodeY = random.random()*mapDimY
-    newNode = Node(nodeX,nodeY)
-    atlas.append(newNode)
-
-npFloatAtlas = np.zeros((numNodes,2))
-for q in range(len(atlas)):
-    nodeX = atlas[q].x
-    nodeY = atlas[q].y
-    npFloatAtlas[q] = [nodeX,nodeY]
-
-print("Triangulating...")
-from scipy.spatial import Delaunay
-triangulation = Delaunay(npFloatAtlas)
-
-trisList = triangulation.vertices
-trisVerts = triangulation.points
-print("Relaxing points...")
-relaxLloyd(npFloatAtlas,1)
-for q in range(len(npFloatAtlas)):
-    nodeX = npFloatAtlas[q,0]
-    nodeY = npFloatAtlas[q,1]
-    atlas[q].x = nodeX
-    atlas[q].y = nodeY
-
-triangles = []
-triIndex = 0
-print("Building triangles...")
-while triIndex < len(trisList):
-    triVertsIndices = trisList[triIndex]
-    newTri = Triangle(atlas[triVertsIndices[0]],atlas[triVertsIndices[1]],atlas[triVertsIndices[2]])
-    triangles.append(newTri)
-    triIndex += 1
-
-print("Assigning neighbors...")
-for tri in triangles:
-    if tri.verts[0].isLinked(tri.verts[1]) == 0:
-        tri.verts[0].link(tri.verts[1])
-    if tri.verts[1].isLinked(tri.verts[2]) == 0:
-        tri.verts[1].link(tri.verts[2])
-    if tri.verts[2].isLinked(tri.verts[0]) == 0:
-        tri.verts[2].link(tri.verts[0])
-
-world.triangles = triangles
->>>>>>> 037c00d9e2123e90a78c04eb86b7ed6f385a20b6
 
