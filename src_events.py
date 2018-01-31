@@ -16,7 +16,7 @@ class Event:
     def ageEvent(self):
         self.age += self.myMap.timeScale
     def summary(self):
-        s = "The "
+        s = "the "
         s += self.kind + " of "
         s += self.sub.justName()
         if self.actors != []:
@@ -24,5 +24,8 @@ class Event:
             for k in self.actors:
                 if k != self.actors[0]:
                     s += " and " + k.justName()
-        s += " " + str(self.age) + " years ago"
+        if self.subject.age < self.subject.culture.mythAge:
+            s += " " + str(self.age) + " years ago"
+        else:
+            s += " before time"
         return s

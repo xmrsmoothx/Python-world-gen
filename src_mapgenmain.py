@@ -46,6 +46,9 @@ def synonym(x,seed=0):
     s["freedom"] = ["freedom","liberation","liberty"]
     s["book"] = ["book","scroll","volume","document","treatise"]
     s["story"] = ["story","novel","epic","poem"]
+    s["large"] = ["large","big","sizable","oversized","bulky"]
+    s["huge"] = ["huge","giant","enormous","colossal","immense"]
+    s["gigantic"] = ["gigantic","tremendous","titanic","humongous","gargantuan"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)
@@ -184,6 +187,7 @@ class Node:
         self.resourceDist = 0
         self.key = 0
         self.roads = []
+        self.entities = []
     def coords(self):
         tupleVert = (self.x,self.y)
         return tupleVert
@@ -1157,7 +1161,11 @@ class Culture:
         self.flag = Flag(self)
         self.bannerColor = self.flag.colors[0]
         self.leaderTitle = self.setLeaderTitle()
-        self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount)
+        if self.leaderCount == 1:
+            ppp = "person"
+        else:
+            ppp = "group"
+        self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount,kind=ppp,node=self.origin)
         self.totalPop = self.populationCount()
         self.oldAge = 80
     def populationCount(self):
@@ -1302,10 +1310,10 @@ class Culture:
         self.leaderCount = 1
         s2 = ""
         if self.society == "Nationalists":
-            return (random.choice(["Master","High","Lord",""])+ " " +
+            return (random.choice(["Master ","High ","Lord ",""]) +
                     random.choice(["Commissioner","Chancellor","Harbinger"]))
         if self.society == "Religious sovereignty" or self.society == "Religious zealots":
-            return (random.choice(["Grand","High","Supreme","Holy"]) + " " +
+            return (random.choice(["Grand ","High ","Supreme ","Holy "]) +
                     random.choice(["Pontiff","Priest","Shepherd"]))
         if self.society == "Agriculturalists" or self.society == "Farming commune" or self.society == "Agricultural communists":
             self.leaderCount = random.choice([1,random.randint(2,10)])
@@ -1314,12 +1322,12 @@ class Culture:
             else:
                 s = random.choice(["Council","Assembly","Soviet","Conference","Directorate"]) + " of "
                 s2 = "s"
-            return (random.choice(["Head","Chief","Master"])+ " " +
+            return (random.choice(["Head ","Chief ","Master "])+
                     random.choice(["Farmer","Agronomist","Foreman"])+s2)
         if self.society == "Imperium" or self.society == "Hegemony" or self.society == "Empire":
             return "Emperor"
         if self.society == "Nomadic artisans" or self.society == "Nomadic peoples" or self.society == "Scavengers":
-            return (random.choice(["Chief","Head","Elder"])+ " " +
+            return (random.choice(["Chief ","Head ","Elder "]) +
                     random.choice(["Captain","Dignitary","Herald"]))
         if (self.society == "Liberal capitalists" or self.society == "Liberal merchant-artisans" or self.society == "Merchant artisans" or 
             self.society == "Traders" or self.society == "Independent merchants" or self.society == "Mercantile folk"
@@ -1330,7 +1338,7 @@ class Culture:
             else:
                 s = random.choice(["Cabinet","Assembly","Board","Committee"]) + " of "
                 s2 = "s"
-            return (s + random.choice(["Primary","Head","Chief",""])+ " " +
+            return (s + random.choice(["Primary ","Head ","Chief ",""]) +
                     random.choice(["Executive","Director","Superintendent"]) + s2)
         if (self.society == "Blacksmiths" or self.society == "Traditionalist artisans" or
             self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
@@ -1340,7 +1348,7 @@ class Culture:
             else:
                 s = random.choice(["Council","Assembly","Congress"]) + " of "
                 s2 = "s"
-            return (s + random.choice(["Master","Elder","Grandmaster",""])+ " " +
+            return (s + random.choice(["Master ","Elder ","Grandmaster ",""]) +
                     random.choice(["Artificer","Builder","Craftsperson"]) + s2)
         if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"
             or self.society == "Communalists" or self.society == "Cooperative" or self.society == "Scholars"):
@@ -1350,14 +1358,14 @@ class Culture:
             else:
                 s = random.choice(["Council","Assembly","Soviet","Conference","Directorate"]) + " of "
                 s2 = "s"
-            return (s+random.choice(["Prime","Chief","Central",""])+ " " +
+            return (s+random.choice(["Prime ","Chief ","Central ",""]) +
                     random.choice(["Director","Governer","Speaker","Chairperson"])+s2)
         if (self.society == "Shamanistic warriors" or self.society == "Shamanic tribe"
             or self.society == "Shamans"):
             return (random.choice(["Elder","High","Grand","Ancestral"])+ " " +
                     random.choice(["Medicine Man","Seer","Shaman"]))
         if self.society == "Pirates" or self.society == "Raiders":
-            return (random.choice(["Chief","Head",""])+ " " +
+            return (random.choice(["Chief ","Head ",""]) +
                     random.choice(["Captain","Commander",""]))
         if self.society == "Social Liberals" or self.society == "Liberals":
             self.leaderCount = random.choice([1,1,random.randint(2,10)])
@@ -1520,11 +1528,14 @@ class Culture:
         s += "Population: " + str(self.populationCount()) + "\n\n"
         s += "Capital: " + self.origin.city.name + "\n\n"
         return s
+    def drawPops(self,drawer):
+        for p in self.populations.keys():
+            self.populations[p].drawSelf(drawer)
 
 # This doesn't strictly represent a "population" as such, 
 # just any sort of significant/named entity in the universe.
 class Population:
-    def __init__(self,c,n=None,t="",a=None,p=1,kind="person"):
+    def __init__(self,c=None,n=None,t="",a=None,p=1,kind="person",node=None):
         self.parents = []
         self.kids = []
         self.culture = c
@@ -1542,23 +1553,104 @@ class Population:
             self.age = math.floor(self.age/self.number)
         else:
             self.age = a
-        self.title = t + " "
+        if t != "":
+            self.title = t + " "
+        else:
+            self.title = t
+        self.kind = kind
         self.fullName = self.nameFull()
         self.culture.populations[self.name] = self
         self.pronouns = ["it","he","she"]
         self.possessive = ["its","his","her"]
         self.gender = random.choice([0,1,2])
+        if self.kind == "person":
+            self.gender = random.choice([1,2])
+        if self.kind == "group" or self.kind == "army":
+            self.gender = 0
         self.description = ""
-        self.kind = kind
         self.associations = []
+        self.location = node
+        if self.location != None:
+            self.location.entities.append(self)
+        self.terrain = 0    # 0=land, 1=water, 2=air(both)
+        if self.kind == "beast":
+            self.genBeast()
     def associate(self):
         k = random.choice(list(self.culture.myMap.spheres))
         self.associations.append(k)
         self.descrip()
+    def genBeast(self):
+        self.gender = random.choice([1,2])
+        humanoids = ["giant","rock elemental","demon","angel","hobgoblin"
+                    "banshee","wendigo","naga","centaur","golem","werewolf",
+                    "dryad","minotaur","ogre","skeleton","vampire"]
+        bipedalA = ["tyrannosaur","ostrich"]
+        bipedalB = ["chimpanzee","monkey","sloth","kangaroo","gorilla"]
+        quadrupedsA = ["tiger","lion","lizard","wolf","rhinoceros",
+                       "hyena","dingo","alligator","bear","crocodile",
+                       "hydra"]
+        quadrupedsB = ["chameleon","cattle","zebra","horse","elephant","armadillo",
+                       "rabbit","antelope","deer","rat","mastodon","platypus","giraffe",
+                       "tortoise","otter","frog","toad","brotosaur","boar",
+                       "unicorn","goat","sheep","elk"]
+        unconventional = ["snake","slug","roach","ant","spider","snail",
+                          "slime","treefolk","worm","scorpion","wurm"]
+        sky = ["dragon","vulture","seagull","hawk","eagle","manticore","swan",
+                  "duck","wasp","bee","raven","bird","dragonfly","bat",
+                  "hippogriff","pegasus","imp"]
+        ocean = ["whale","shark","jellyfish","squid","octopus","bass","trout","carp",
+                   "koi","snake","snail","slug","seal","turtle","porpoise","penguin",
+                   "otter","manatee","salamander","angler","dolphin","crab","cuttlefish",
+                   "skate","ray","serpent","seahorse","nautilus","kraken"]
+        if self.location.elevation < self.culture.myMap.sealevel:
+            self.terrain = 1
+        if random.random() < 0.25:
+            self.terrain = 2
+        self.aggression = random.choice(["docile","neutral","aggressive"])
+        if self.terrain == 0:
+            if self.aggression == "docile":
+                spheres = bipedalB+quadrupedsB+unconventional
+            elif self.aggression == "neutral":
+                spheres = bipedalB+quadrupedsB+unconventional+humanoids
+            else:
+                spheres = bipedalA+bipedalB+quadrupedsA+quadrupedsB+unconventional+humanoids
+        elif self.terrain == 1:
+            spheres = ocean
+        else:
+            spheres = sky
+        self.species = random.choice(spheres)
+        self.size = random.choice(["large","huge","gigantic"])
+        if self.size == "large":
+            bigness = 1
+        elif self.size == "huge":
+            bigness = 2
+        elif self.size == "gigantic":
+            bigness = 3
+        self.power = [0,0]
+        medianpower = 100
+        minpower = math.floor(medianpower*0.666666)
+        maxpower = math.floor(medianpower*1.5)
+        self.power[0] = random.randint(minpower,maxpower)*bigness
+        self.power[1] = random.randint(minpower,maxpower)*bigness
+        if self.species == "turtle" or self.species == "tortoise":
+            self.power[0] *= 0.75
+            self.power[1] *= 2
+        self.power[0] = math.floor(self.power[0])
+        self.power[1] = math.floor(self.power[1])
+        titles = ["devourer","destroyer","primordial beast","ancient beast",
+                  "wanderer","behemoth","titanic beast","colossal beast","goliath",
+                  "gargantuan","monumental beast"]
+        self.title = random.choice(titles) + " "
+        e = Event(self.culture.myMap,a=self.age,kind="birth",sub=self)
+        e.importance = math.floor((self.power[0]/400)+(self.age/400))
     def descrip(self):
         s = self.pronouns[self.gender].capitalize() + " is"
+        if self.kind == "group":
+            g = "group of approximately "
+        else:
+            g = ""
         if self.age < self.culture.mythAge:
-            s += " a " + str(self.age) + "-year-old "
+            s += " a " + g +str(self.age) + "-year-old "
         else:
             s += " an ageless "
         if self.kind == "deity":
@@ -1569,12 +1661,33 @@ class Population:
         if self.kind == "person":
             s += "person from the "
             s += self.culture.name + " culture"
+        if self.kind == "group":
+            s += "people from the "
+            s += self.culture.name + " culture.\n"
+            s += self.pronouns[self.gender].capitalize()
+            s += " is composed of " + str(self.number) + " people"
         if self.kind == "location":
             s += "location of the "
             s += self.culture.name + " culture"
+        if self.kind == "beast":
+            s += "wild beast named by the "
+            s += self.culture.name + " culture.\n"
+            s += self.pronouns[self.gender].capitalize() + " is a "
+            s += synonym(self.size,seedNum(self.name[0]))
+            s += " " + self.species
+            s += " and"
+            if self.terrain == 0:
+                s += " lives only on land"
+            elif self.terrain == 1:
+                s += " lives only in water"
+            else:
+                s += " can fly over both land and water"
+            s += ".\n"
+            s += self.possessive[self.gender].capitalize()
+            s += " temperament is " + self.aggression
         s += ".\n"
         if len(self.parents) == 0:
-            s += " "
+            s += ""
         elif len(self.parents) == 1:
             s += self.possessive[self.gender].capitalize() + " parent is"
             s += " the " + self.parents[0].nameFull()
@@ -1586,7 +1699,7 @@ class Population:
             s += " the " + self.parents[1].nameFull()
             s += ".\n"
         if len(self.kids) == 0:
-            s += " "
+            s += ""
         elif len(self.kids) == 1:
             s += self.possessive[self.gender].capitalize() + " child is"
             s += " the " + self.kids[0].nameFull()
@@ -1638,6 +1751,24 @@ class Population:
         s += " of the society of " + self.culture.name + ".\n\n"
         s += self.descrip()
         return s
+    def drawSelf(self,drawer):
+        if self.location == None:
+            return -1
+        if self.location.city != None:
+            return -1
+        x = math.floor(self.location.x)
+        y = math.floor(self.location.y)
+        pts = [(x,y),(x-1,y),(x+1,y),(x-2,y),(x+2,y),(x,y+1),
+               (x-1,y+1),(x+1,y+1),(x,y-1),(x-2,y-1),(x+2,y-1),
+               (x,y-2),(x-1,y-2),(x+1,y-2),(x-2,y-2),(x+2,y-2),(x,y-2)]
+        drawer.point(pts,fill=(0,0,255))
+        pts = [(x-1,y-1),(x+1,y-1),(x,y+3),(x+2,y+3),(x-2,y+3),
+               (x-2,y-3),(x-1,y-3),(x,y-3),(x+1,y-3),(x+2,y-3),
+               (x-3,y-2),(x-3,y-1),(x-3,y),(x-3,y+1),(x-2,y+1),
+               (x+3,y-2),(x+3,y-1),(x+3,y),(x+3,y+1),(x+2,y+1),
+               (x-2,y+2),(x-1,y+2),(x,y+2),(x+1,y+2),(x+2,y+2)]
+        drawer.point(pts,fill=(0,0,0))
+        
 
 class Flag:
     def __init__(self,c):
@@ -1785,6 +1916,7 @@ class Map:
         self.displayNo = None
         self.infoGui = None
         self.viewmode = 0
+        self.drawpops = 1
         self.timeScale = 1
         self.age = random.randint(1000,100000)
     def setNorth(self):
@@ -1890,6 +2022,9 @@ class Map:
     def nodeInfo(self,n):
         self.divWidth = 64
         info = ""
+        pops = len(n.entities)
+        if pops != 0:
+            info += "Number of notable entities at this location: " + str(pops) + "\n"
         if n.city != None:
             info += strDivider(self.divWidth)+"\n"
             info += self.nodeCityInfo(n) + "\n"
@@ -2520,6 +2655,18 @@ class Map:
             k.defaultRoads()
         for i in range(n):
             self.randomCity()
+    def scatterBeasts(self,n):
+        for i in range(n):
+            anchor = random.choice(self.atlas)
+            while anchor.city != None:
+                anchor = random.choice(self.atlas)
+            if anchor.elevation < self.sealevel:
+                aquatic = 1
+            else:
+                aquatic = 0
+            culture = self.nearestCity(anchor.x,anchor.y).culture
+            age = random.randint(24,256)
+            monster = Population(c=culture,n=None,t="",a=age,p=1,kind="beast",node=anchor)
     def drawGraph(self,gui=None):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -2588,6 +2735,9 @@ class Map:
                     r.drawRiver(graphDraw,self.xDim)
             for c in self.cities:
                 c.drawSelf(graphDraw)
+        if self.drawpops == 1:
+            for c in self.cultures:
+                c.drawPops(graphDraw)
         visualAtlas = visualAtlas.convert("RGB")
         visualAtlas.save(self.mapname,"GIF")
         photo = Image.open(self.mapname)
@@ -2661,7 +2811,7 @@ class Map:
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = g: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "SteelBlue4"
+            c1 = "SteelBlue2"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def cultureInfo(self):
         if self.displayNo == None:
@@ -2702,7 +2852,7 @@ class Map:
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = self.displayCulture.deities[i]: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "SteelBlue4"
+            c1 = "SteelBlue2"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def cityInfo(self):
         if self.displayNo == None:
@@ -2729,11 +2879,37 @@ class Map:
         b1.pack(anchor=S,side=RIGHT)
         c1 = "medium aquamarine"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+    def entitiesInfo(self):
+        if self.displayNo == None:
+            return -1
+        entities = self.displayNo.entities
+        if entities == []:
+            return -1
+        if self.infoGui != None:
+            self.infoGui.destroy()
+        self.infoGui = Toplevel()
+        self.popsString = StringVar()
+        self.popsString.set("    Notable entities at the selected location:    \n")
+        cdsc = Label(self.infoGui,textvariable=self.popsString)
+        cdsc.pack()
+        for p in entities:
+            s = "The " + p.nameFull()
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, e = p: self.popInfo(e))
+            b1.pack(anchor=S,side=BOTTOM,expand=YES,fill=BOTH)
+            c1 = "SteelBlue2"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def changeView(self):
         if self.viewmode == 1:
             self.viewmode = 0
         else:
             self.viewmode += 1
+        self.redraw()
+    def dispEntities(self):
+        if self.drawpops == 1:
+            self.drawpops = 0
+        else:
+            self.drawpops += 1
         self.redraw()
     def drawReal(self,gui=None):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
@@ -2778,10 +2954,19 @@ class Map:
             b3.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "aquamarine"
             b3.config(bg=c1,activebackground=c1,activeforeground=c1)
+            b5 = Button(gui,text="Entities Info",command=self.entitiesInfo)
+            b5.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "cadet blue"
+            b5.config(bg=c1,activebackground=c1,activeforeground=c1)
             b2 = Button(gui,text="Change Mode",command=self.changeView)
             b2.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "sandy brown"
+            c1 = "salmon2"
             b2.config(bg=c1,activebackground=c1,activeforeground=c1)
+            b4 = Button(gui,text="Toggle Entities",command=self.dispEntities)
+            b4.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "salmon4"
+            b4.config(bg=c1,activebackground=c1,activeforeground=c1)
+            self.redraw()
             gui.mainloop()
 
 #----------------------------------------------------------------------#            
@@ -2861,6 +3046,7 @@ world.influences()
 world.values()
 world.godSpheres()
 world.scatterCities(16)
+world.scatterBeasts(24)
 print("Drawing map...")
 root = Tk()
 world.drawReal(root)
