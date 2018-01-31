@@ -39,6 +39,13 @@ def synonym(x,seed=0):
     s["fertility"] = ["fertility","plenty","abundance"]
     s["darkness"] = ["darkness","night","twilight","dusk"]
     s["death"] = ["death","mortality"]
+    s["ice"] = ["ice","snow","frost"]
+    s["greed"] = ["greed","wealth","gold"]
+    s["sky"] = ["sky","stars","heavens"]
+    s["collectivists"] = ["collectivists","community","cooperation"]
+    s["freedom"] = ["freedom","liberation","liberty"]
+    s["book"] = ["book","scroll","volume","document","treatise"]
+    s["story"] = ["story","novel","epic","poem"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)
@@ -637,7 +644,7 @@ class Region:
             self.biome += " tundra"
         if self.biome == "water":
             bodysize = len(self.nodes)
-            if bodysize > 1024:
+            if bodysize > 2048:
                 self.biome = "ocean"
             elif bodysize > 512:
                 self.biome = "sea"
@@ -1279,7 +1286,7 @@ class Culture:
             self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
             return "Artisans"
         if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"
-            or self.society == "Communalists"):
+            or self.society == "Communalists" or self.society == "Co-operative"):
             return random.choice(["People's Union","Union","Collective"])
         if (self.society == "Shamanistic warriors" or self.society == "Shamanic tribe"
             or self.society == "Shamans"):
@@ -1293,6 +1300,7 @@ class Culture:
         return "People"
     def setLeaderTitle(self):
         self.leaderCount = 1
+        s2 = ""
         if self.society == "Nationalists":
             return (random.choice(["Master","High","Lord",""])+ " " +
                     random.choice(["Commissioner","Chancellor","Harbinger"]))
@@ -1304,9 +1312,10 @@ class Culture:
             if self.leaderCount == 1:
                 s = ""
             else:
-                s = " " + random.choice(["Council","Assembly","Soviet","Conference","Directorate"])
+                s = random.choice(["Council","Assembly","Soviet","Conference","Directorate"]) + " of "
+                s2 = "s"
             return (random.choice(["Head","Chief","Master"])+ " " +
-                    random.choice(["Farmer","Agronomist","Foreman"])+s)
+                    random.choice(["Farmer","Agronomist","Foreman"])+s2)
         if self.society == "Imperium" or self.society == "Hegemony" or self.society == "Empire":
             return "Emperor"
         if self.society == "Nomadic artisans" or self.society == "Nomadic peoples" or self.society == "Scavengers":
@@ -1319,27 +1328,30 @@ class Culture:
             if self.leaderCount == 1:
                 s = ""
             else:
-                s = " " + random.choice(["Cabinet","Assembly","Board","Committee"])
-            return (random.choice(["Primary","Head","Chief",""])+ " " +
-                    random.choice(["Executive","Director","Superintendent"]) + s)
+                s = random.choice(["Cabinet","Assembly","Board","Committee"]) + " of "
+                s2 = "s"
+            return (s + random.choice(["Primary","Head","Chief",""])+ " " +
+                    random.choice(["Executive","Director","Superintendent"]) + s2)
         if (self.society == "Blacksmiths" or self.society == "Traditionalist artisans" or
             self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
             self.leaderCount = random.choice([1,random.randint(2,10)])
             if self.leaderCount == 1:
                 s = ""
             else:
-                s = " " + random.choice(["Council","Assembly","Congress"])
-            return (random.choice(["Master","Elder","Grandmaster"])+ " " +
-                    random.choice(["Artificer","Builder","Craftsperson",""]) + s)
+                s = random.choice(["Council","Assembly","Congress"]) + " of "
+                s2 = "s"
+            return (s + random.choice(["Master","Elder","Grandmaster",""])+ " " +
+                    random.choice(["Artificer","Builder","Craftsperson"]) + s2)
         if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"
             or self.society == "Communalists" or self.society == "Cooperative" or self.society == "Scholars"):
             self.leaderCount = random.choice([1,random.randint(2,20)])
             if self.leaderCount == 1:
                 s = ""
             else:
-                s = " " + random.choice(["Council","Assembly","Soviet","Conference","Directorate"])
-            return (random.choice(["Prime","Chief","Central",""])+ " " +
-                    random.choice(["Director","Governer","Speaker"])+s)
+                s = random.choice(["Council","Assembly","Soviet","Conference","Directorate"]) + " of "
+                s2 = "s"
+            return (s+random.choice(["Prime","Chief","Central",""])+ " " +
+                    random.choice(["Director","Governer","Speaker","Chairperson"])+s2)
         if (self.society == "Shamanistic warriors" or self.society == "Shamanic tribe"
             or self.society == "Shamans"):
             return (random.choice(["Elder","High","Grand","Ancestral"])+ " " +
@@ -1352,8 +1364,9 @@ class Culture:
             if self.leaderCount == 1:
                 s = ""
             else:
-                s = " " + random.choice(["Congress","Chamber","Parliament","Ministry"])
-            return random.choice(["President","Speaker","Minister"]) + s
+                s = random.choice(["Congress","Chamber","Parliament","Ministry"]) + " of "
+                s2 = "s"
+            return random.choice(["President","Speaker","Minister"]) + s2
         return "Chief"
     def generateMythology(self):
         self.deities = []
@@ -1419,13 +1432,15 @@ class Culture:
                 k = clamp(maxtiers-tiers,1,maxtiers)
             else:
                 k += 1
-        aa = random.random()*16
-        ageOf = round(self.myMap.age*aa/4)
-        rr = random.randint(1,32)
+        aa = random.random()*8
+        ageOf = round(self.myMap.age*aa)
+        self.mythAge = ageOf
+        rr = 1.2
         f = Population(self,n=self.language.genName(),t=titles[0],a=ageOf,kind="location")
         f.gender = 0
-        e = Event(self.myMap,ageOf,"genesis",f,[])
-        e.importance = 100
+        if ageOf < self.myMap.age:
+            e = Event(self.myMap,ageOf,"genesis",f,[])
+            e.importance = 100
         self.deities.append(f)
         for k in range(clamp(maxtiers-tiers,1,maxtiers),tiers):
             entities = math.ceil((random.randint(0,2)+k)/2)
@@ -1456,6 +1471,7 @@ class Culture:
                 ent.associate()
                 self.deities.append(ent)
                 e = Event(self.myMap,age,"birth",ent,ent.parents)
+                e.importance = 100/k
     def shortName(self):
         name = ""
         name += self.name + " " + self.title
@@ -1541,7 +1557,10 @@ class Population:
         self.descrip()
     def descrip(self):
         s = self.pronouns[self.gender].capitalize() + " is"
-        s += " a " + str(self.age) + "-year-old "
+        if self.age < self.culture.mythAge:
+            s += " a " + str(self.age) + "-year-old "
+        else:
+            s += " an ageless "
         if self.kind == "deity":
             s += "deity of "
             s += synonym(self.associations[0],seedNum(self.name[0]))
@@ -1685,8 +1704,10 @@ class Language:
     def characters(self):
         c = ['b','c','d','f','g','h','j','k','l','m','n','p','q','r','s','t','v','w','x','y','z']
         v = ['a','e','i','o','u']
+        e = ['\'','-']
         self.langConsonants = []
         self.langVowels = []
+        self.langExtras = []
         count = 32
         n = 1
         while len(c) > 0:
