@@ -196,6 +196,7 @@ class Block:
             s1.subdivide(size)
             self.subblocks.append(s1)
             self.substreets.append(q)
+            
     def drawSelf(self,drawer):
         dCol = (0,0,0)
         if self.type == "water":
