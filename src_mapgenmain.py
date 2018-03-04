@@ -13,56 +13,8 @@ from tkinter import *
 from PIL import Image, ImageDraw, ImageTk
 from src_towngen import *
 from src_events import *
-
-def synonym(x,seed=0):
-    s = {}
-    s["mountain"] = ["mountain","peak","ridge"]
-    s["savanna"] = ["savanna","plain","prairie"]
-    s["shrubland"] = ["shrubland","badlands","bushland"]
-    s["forest"] = ["forest","woods","wood","woodland"]
-    s["desert"] = ["desert","desert","wastes","barrens"]
-    s["tundra"] = ["tundra","steppe","tundra"]
-    s["frost tundra"] = ["frost tundra","arctic","alpines","frozen tundra"]
-    s["tropical forest"] = ["tropical forest","jungle"]
-    s["boreal forest"] = ["boreal forest","woods","wood","taiga"]
-    s["carnivores"] = ["carnivores","predators"]
-    s["herbivores"] = ["herbivores","livestock"]
-    s["fear"] = ["fear","terror"]
-    s["warriors"] = ["warriors","fighters","soldiers"]
-    s["agriculture"] = ["agriculture","farming","irrigation"]
-    s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
-    s["village"] = ["village","hamlet"]
-    s["township"] = ["township","settlement"]
-    s["plantlife"] = ["plantlife","plants","vegetation","flora"]
-    s["vegetation"] = ["plantlife","plants","vegetation","flora"]
-    s["fields"] = ["fields","farms","pastures"]
-    s["metallicity"] = ["metallicity","metals","ore"]
-    s["fertility"] = ["fertility","plenty","abundance"]
-    s["darkness"] = ["darkness","night","twilight","dusk"]
-    s["death"] = ["death","mortality"]
-    s["ice"] = ["ice","snow","frost"]
-    s["greed"] = ["greed","wealth","gold"]
-    s["sky"] = ["sky","stars","heavens"]
-    s["collectivists"] = ["collectivists","community","cooperation"]
-    s["freedom"] = ["freedom","liberation","liberty"]
-    s["book"] = ["book","scroll","volume","document","treatise"]
-    s["story"] = ["story","novel","epic","poem"]
-    s["large"] = ["large","big","sizable","oversized","bulky"]
-    s["huge"] = ["huge","giant","enormous","colossal","immense"]
-    s["gigantic"] = ["gigantic","tremendous","titanic","humongous","gargantuan"]
-    syn = x
-    if x in s.keys():
-        ch = random.randint(0,len(s[x])-1)
-        if seed != 0:
-            ch = seed % len(s[x])
-        syn = s[x][ch]
-    return syn
-
-def seedNum(s):
-    v = 0
-    for k in s:
-        v += ord(k)
-    return v
+from src_items import *
+from src_tools import *
 
 def lerp(t,a,b):
     return a + t * (b - a)
@@ -786,7 +738,7 @@ class City:
                 self.node.river.culturalNames[self.culture.name] = self.culture.language.genName()
         reg = ResourceRegion(self,self.myMap)
         self.rawResources = [0,0]
-        self.age = 0
+        self.age = random.randint(0,20)
         self.roads = []
         e = Event(self.culture.myMap,a=self.age,kind="founding",sub=self,actrs=[self.culture.leader])
         e.importance = random.randint(10,40)+clamp(math.floor(math.sqrt(self.population)),0,25)
@@ -905,6 +857,10 @@ class City:
         else:
             c = "metropolis"
         return c.capitalize()
+    def justName(self):
+        return self.name
+    def nameFull(self):
+        return self.cType(self.population) + " " + self.name
     def cityInfo(self):
         n = self.name + " (" + self.cityType + ")\n"
         n += "Population: " + str(self.population)
@@ -1017,13 +973,13 @@ class City:
         p2 = (xx+6,yy+2)
         p3 = (xx,yy-3)
         drawer.polygon([p1,p2,p3],outline=out,fill=col)
-        p0 = (xx-3,yy-4)
+        p0 = (xx-3,yy-5)
         p1 = (xx-3,yy+3)
         p2 = (xx+3,yy+3)
-        p3 = (xx+3,yy-4)
+        p3 = (xx+3,yy-5)
         drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
-        p0 = (xx-1,yy-8)
-        p1 = (xx+1,yy-8)
+        p0 = (xx-1,yy-9)
+        p1 = (xx+1,yy-9)
         p2 = (xx+1,yy+4)
         p3 = (xx-1,yy+4)
         drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
@@ -1213,10 +1169,11 @@ class Culture:
             self.ppp = "person"
         else:
             self.ppp = "group"
-        self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount,kind=self.ppp,node=self.origin)
+        self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount,kind=self.ppp,node=self.origin,prf="politician")
         self.totalPop = self.populationCount()
         self.oldAge = 75
         self.tech = {}
+        self.items = []
         for k in list(self.myMap.technologies.keys()):
             self.tech[k] = 1
         for p in range(24):
@@ -1242,7 +1199,7 @@ class Culture:
             m = self.value.mainValues
             if "metallurgists" in m:
                 if t == "mining":
-                    multiplier = multiplier*1.4
+                    multiplier = multiplier*1.2
             if "builders" in m:
                 if t == "defense":
                     multiplier = multiplier*1.4
@@ -1268,19 +1225,22 @@ class Culture:
                 if t == "art" or t == "philosophy":
                     multiplier = multiplier*1.3
             if "simplicity" in m:
-                multiplier = multiplier*0.6
+                multiplier = multiplier*0.5
             if self.society in ["Paleolithic tribe","Hunter-gatherer tribe"]:
                 multiplier = multiplier*0.3
-            if self.society == "Scholars" or self.society == "Astronomers":
-                if t == "research":
-                    multiplier = multiplier*1.3
+            if self.society == "Scholars":
+                if t == "research" or t == "philosophy":
+                    multiplier = multiplier*1.4
             if self.society == "Blacksmiths":
                 if t == "mining":
-                    multiplier = multiplier*1.3
+                    multiplier = multiplier*1.2
             if "artisans" in self.society:
                 if t == "production":
+                    multiplier = multiplier*1.2
+            if "agriculturalists" in self.society:
+                if t == "agriculture":
                     multiplier = multiplier*1.3
-            multiplier = multiplier*math.sqrt(self.tech["research"])
+            multiplier = multiplier*(self.tech["research"]**0.3333)
             self.tech[t] = self.tech[t]*(multiplier+1)
     def updatePops(self):
         for f in list(self.populations.keys()):
@@ -1292,7 +1252,7 @@ class Culture:
             d.agePop(self.myMap.timeScale)
         if self.leader == None or self.leader.number == 0:
             pp = self.leader
-            self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount,kind=self.ppp,node=self.origin)
+            self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount,kind=self.ppp,node=self.origin,prf="politician")
             if self.leaderCount == 1:
                 if self.society in ["Hegemony","Empire","Imperium","Monarchy"]:
                     self.leader.name[1] = pp.name[1]
@@ -1302,8 +1262,16 @@ class Culture:
                 e.importance = random.randint(1,55)
         if self.leader.number < self.leaderCount:
             cont = self.leaderCount-self.leader.number
-            repl = Population(self,t=self.leaderTitle,p=cont,kind=self.ppp,node=self.origin)
+            repl = Population(self,t=self.leaderTitle,p=cont,kind=self.ppp,node=self.origin,prf="politician")
             self.leader.addPop(repl)
+        nn = 0.2
+        pp = self.populationCount()
+        figs = len(self.populations)
+        pmod = clamp((pp**nn)/(0.92),0,10)*0.01
+        redc = clamp(figs/75,0,1)*0.1
+        while random.random() > ((0.99-pmod)+redc):
+            ctnodes = [c.node for c in self.cities]
+            fig = Population(self,p=1,kind="person",node=random.choice(ctnodes))
     def updateCulture(self):
         self.updateTech()
         if self.deities[0].age % self.electionYear == 0:
@@ -1690,16 +1658,17 @@ class Culture:
         s += "Civilian population: " + str(self.populationCount()) + "\n\n"
         s += "Capital: " + self.origin.city.name + "\n\n"
         for k in self.tech.keys():
-            lvl = self.tech[k]**2
+            lv = self.tech[k]
+            lvl = ((2**(lv-4))/((2**(lv-4))+1))*6.05
             if abs(round(lvl)-lvl) > 0.35:
-                ss = "intermediate "
+                ss = " ~= "
             elif round(lvl) > lvl:
-                ss = "late "
+                ss = " >= "
             else:
-                ss = "early "
+                ss = " <= "
             lvl = math.floor(lvl)
-            s += "Their knowledge of " + k
-            s += " is approximately equal to " + ss
+            s += "" + k
+            s += "" + ss
             s += self.myMap.techtiers[lvl] + " humanity.\n"
         return s
     def drawPops(self,drawer):
@@ -1709,11 +1678,32 @@ class Culture:
 # This doesn't strictly represent a "population" as such, 
 # just any sort of significant/named entity in the universe.
 class Population:
-    def __init__(self,c=None,n=None,t="",a=None,p=1,kind="person",node=None):
+    def __init__(self,c=None,n=None,t="",a=None,p=1,kind="person",node=None,prf=None):
+        self.tt = "pop"
         self.parents = []
         self.kids = []
         self.culture = c
         self.number = p
+        self.profession = prf
+        self.kind = kind
+        self.importance = random.randint(1,16)
+        if (prf == None and (self.kind == "group" or self.kind == "person")):
+            self.professions = ["artist","artist","artist",
+                                "philosopher","researcher",
+                           "politician","engineer","tactician",
+                           "doctor","farmer","sociologist",
+                           "blacksmith","blacksmith","blacksmith"]
+            self.profession = random.choice(self.professions)
+        if self.profession != None:
+            self.fields = {"artist":"art","philosopher":"philosophy",
+                      "researcher":"research","politician":"government",
+                      "engineer":"production","tactician":"weaponry",
+                      "doctor":"medicine","farmer":"agriculture",
+                      "sociologist":"equality","blacksmith":"metallurgy",
+                      "craftsman":"production"}
+            self.field = self.fields[self.profession]
+        else:
+            self.field = None
         if n == None or n in self.culture.populations.keys():
             self.name = (self.culture.language.genName(),self.culture.language.genName())
             if self.number > 1:
@@ -1721,14 +1711,13 @@ class Population:
         else:
             self.name = (n,"")
         if a == None:
-            self.age = random.randint(20,40)
+            self.age = random.randint(23,45)
         else:
             self.age = a
         if t != "":
             self.title = t + " "
         else:
             self.title = t
-        self.kind = kind
         self.fullName = self.nameFull()
         self.culture.populations[self.name] = self
         self.pronouns = ["it","he","she"]
@@ -1751,13 +1740,14 @@ class Population:
             or self.kind == "location"):
             self.immortal = 1
         self.dead = 0
+        self.works = []
     def associate(self):
         k = random.choice(list(self.culture.myMap.spheres))
         self.associations.append(k)
         self.descrip()
     def genBeast(self):
         self.gender = random.choice([1,2])
-        humanoids = ["giant","rock elemental","demon","angel","hobgoblin"
+        humanoids = ["giant","elemental","demon","angel","hobgoblin"
                     "banshee","wendigo","naga","centaur","golem","werewolf",
                     "dryad","minotaur","ogre","skeleton","vampire",
                     "cyclops","gorgon"]
@@ -1829,6 +1819,7 @@ class Population:
         self.title = random.choice(titles) + " "
         e = Event(self.culture.myMap,a=self.age,kind="birth",sub=self,loc=self.location)
         e.importance = math.floor((self.power[0]/8)+(self.age/8))
+        self.importance += 24
     def meander(self):
         if random.random() > 0.5:
             return -1
@@ -1888,6 +1879,20 @@ class Population:
             s += self.possessive[self.gender].capitalize()
             s += " temperament is " + self.aggression
         s += ".\n"
+        if self.profession != None:
+            if self.number > 1:
+                s += "They are "
+            else:
+                s += self.pronouns[self.gender].capitalize() + " is a"
+                vows = ['a','e','i','o','u']
+                if self.profession[0] in vows:
+                    s += "n "
+                else:
+                    s += " "
+            s += self.profession
+            if self.number > 1:
+                s += "s"
+            s += ".\n"
         if len(self.parents) == 0:
             s += ""
         elif len(self.parents) == 1:
@@ -1937,6 +1942,9 @@ class Population:
         p.number = 0
     def agePop(self,scl):
         self.age += scl
+        self.importance = self.importance*1.005
+        if random.random() > 0.985:
+            self.createWork()
         if self.age > self.culture.oldAge and self.immortal == 0:
             if random.random() < 0.1:
                 self.number = math.floor(self.number*random.random())
@@ -1950,6 +1958,46 @@ class Population:
             if self in self.location.entities:
                 self.location.entities.remove(self)
         self.dead = 1
+    def createWork(self):
+        if self.field == None or self.field == "":
+            return -1
+        kind = "book"
+        subj = None
+        if self.profession in ["artist","philosopher","politician","tactician"]:
+            if random.random() > 0.7:
+                kind = "story"
+        if self.profession in ["artist"]:
+            if random.random() > 0.15:
+                kind = "piece"
+        if self.profession in ["craftsman","blacksmith","engineer"]:
+            if random.random() > 0.15:
+                kind = random.choice(["weapon","helmet"])
+        t = ""
+        if random.random() > 0.4:
+            t = random.choice(["event","pop","item"])
+        if t == "event":
+            e = random.choice(self.culture.myMap.events)
+            while (e.subject.culture != self.culture and
+                   random.random() < 0.96-(e.importance/100)):
+                e = random.choice(self.culture.myMap.events)
+            subj = e
+        if t == "pop":
+            p = self.culture.populations[random.choice(list(self.culture.populations.keys()))]
+            while (random.random() < 0.96-(p.importance/100)):
+                p = self.culture.populations[random.choice(list(self.culture.populations.keys()))]
+            subj = p
+        if t == "item" and len(self.culture.items) != 0:
+            i = random.choice(self.culture.items)
+            while (random.random() < 0.96-(i.importance/100)):
+                i = random.choice(self.culture.items)
+            subj = i
+        if random.random() > 0.5:
+            fff = self.field
+        else:
+            fff = random.choice(self.culture.myMap.spheres)
+        w = Item(k=kind,c=self.culture,f=fff,s=subj,i=self.importance*random.uniform(0.5,1.1),cr=self)
+        self.works.append(w)
+        self.importance = self.importance*1.1
     def justName(self):
         s = self.name[0]
         if self.name[1] != "":
@@ -1959,14 +2007,22 @@ class Population:
         if self.title != "":
             s = self.title + self.name[0]
         else:
-            s = self.kind + " " + self.name[0]
+            if self.profession == None:
+                s = self.kind + " " + self.name[0]
+            else:
+                s = self.profession + " " + self.name[0]
         if self.name[1] != "":
             s += " " + self.name[1]
         return s
     def popNotes(self):
         s = "The "
         s += self.nameFull()
-        s += " is a " + self.kind + ".\n\n"
+        s += " is a"
+        if self.kind == "army":
+            s += "n "
+        else:
+            s += " "
+        s += self.kind + ".\n\n"
         s += self.descrip()
         return s
     def drawSelf(self,drawer):
@@ -2137,6 +2193,7 @@ class Map:
         self.viewmode = 0
         self.drawpops = 1
         self.timeScale = 1
+        self.autoCycle = 0
         self.age = random.randint(1000,100000)
     def setNorth(self):
         nx = math.floor(random.random()*self.xDim)
@@ -2869,9 +2926,9 @@ class Map:
         self.technologies["art"] = 1
         self.technologies["philosophy"] = 1
         self.technologies["medicine"] = 1
-        self.techtiers = ["early","primitive","bronze age",
+        self.techtiers = ["primitive","bronze age",
                            "classical period","medieval","industrial",
-                           "modern","space-age","extrasolar"]
+                           "modern","space-age","galactic"]
         # e.g. "medieval humanity", "classical period humanity"
     def godSpheres(self):
         s0 = list(self.influences.keys())
@@ -3035,6 +3092,77 @@ class Map:
         self.updateEvents()
         self.updateTerritory()
         self.redraw()
+    def autoTurnsStart(self):
+        self.autoCycle = 1-self.autoCycle
+        self.autoTurns()
+    def autoTurns(self):
+        if self.autoCycle == 1:
+            self.nextTurn()
+            self.gui.after(1000,self.autoTurns)
+    def eventInfo(self,e=None):
+        if e == None:
+            return -1
+        if self.infoGui != None:
+            self.infoGui.destroy()
+        self.infoGui = Toplevel()
+        self.eString = StringVar()
+        self.eString.set(e.fullDesc())
+        pdsc = Label(self.infoGui,textvariable=self.eString)
+        pdsc.pack(anchor=W,side=RIGHT)
+        self.displayCulture = e.subject.culture
+        b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
+        b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+        c1 = "medium aquamarine"
+        b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        g = e.subject
+        s = " "+g.justName()+" "
+        b1 = Button(self.infoGui,text=s)
+        b1.configure(command = lambda self=self, d = g: self.popInfo(d))
+        b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+        c1 = "SteelBlue1"
+        b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        for g in e.actors:
+            s = " "+g.justName()+" "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = g: self.popInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SteelBlue2"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+    def itemInfo(self,e=None):
+        if e == None:
+            return -1
+        if self.infoGui != None:
+            self.infoGui.destroy()
+        self.infoGui = Toplevel()
+        self.eString = StringVar()
+        self.eString.set(e.description())
+        pdsc = Label(self.infoGui,textvariable=self.eString)
+        pdsc.pack(anchor=W,side=RIGHT)
+        self.displayCulture = e.culture
+        b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
+        b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+        c1 = "medium aquamarine"
+        b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        g = e.creator
+        s = " "+g.justName()+" (Creator) "
+        b1 = Button(self.infoGui,text=s)
+        b1.configure(command = lambda self=self, d = g: self.popInfo(d))
+        b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+        c1 = "SteelBlue1"
+        b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        if e.subject != None:
+            g = e.subject
+            s = " "+g.justName()+" (Subject) "
+            b1 = Button(self.infoGui,text=s)
+            if g.tt == "pop":
+                b1.configure(command = lambda self=self, d = g: self.popInfo(d))
+            if g.tt == "event":
+                b1.configure(command = lambda self=self, d = g: self.eventInfo(d))
+            if g.tt == "item":
+                b1.configure(command = lambda self=self, d = g: self.itemInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SteelBlue2"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def popInfo(self,p=None):
         if p == None:
             return -1
@@ -3046,10 +3174,11 @@ class Map:
         pdsc = Label(self.infoGui,textvariable=self.popString)
         pdsc.pack(anchor=W,side=RIGHT)
         self.displayCulture = p.culture
-        b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
-        b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-        c1 = "medium aquamarine"
-        b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        if p.kind != "beast":
+            b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "medium aquamarine"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
         if p.kind == "deity":
             b1 = Button(self.infoGui,text="Mythology Info",command=self.mythologyInfo)
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
@@ -3068,6 +3197,13 @@ class Map:
             b1.configure(command = lambda self=self, d = g: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "SteelBlue2"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        for g in p.works:
+            s = " "+g.justName()+" (Work) "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = g: self.itemInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SteelBlue4"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def cultureInfo(self):
         if self.displayNo == None:
@@ -3213,6 +3349,10 @@ class Map:
             b0.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "orange red"
             b0.config(bg=c1,activebackground=c1,activeforeground=c1)
+            b6 = Button(gui,text=" Toggle auto \n cycle turns ",command=self.autoTurnsStart)
+            b6.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "firebrick4"
+            b6.config(bg=c1,activebackground=c1,activeforeground=c1)
             b1 = Button(gui,text="Society Info",command=self.cultureInfo)
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "medium aquamarine"

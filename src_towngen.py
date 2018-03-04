@@ -183,7 +183,7 @@ class Block:
                 l1 = len(pts1)+2
                 if l0 > 3 and l1 > 3:
                     sub = 1
-            ww = random.randint(2,4)
+            ww = random.randint(2,7)
             q = Street(div0,div1,ww)
             s = Block(self.myTown)
             s.verts = [div1,div0]
@@ -237,7 +237,7 @@ class Town:
         for i in range(len(primVor.ridge_vertices)):
             in0 = primVor.ridge_vertices[i][0]
             in1 = primVor.ridge_vertices[i][1]
-            newStreet = Street(self.streetNodes[in0],self.streetNodes[in1],4)
+            newStreet = Street(self.streetNodes[in0],self.streetNodes[in1],7)
             self.streets.append(newStreet)
         self.population = self.node.city.population
         self.radius = 32+(math.sqrt(self.population)*3)
