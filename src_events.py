@@ -28,7 +28,7 @@ class Event:
         s += self.subject.justName()
         return s
     def summary(self):
-        s = "The "
+        s = "the "
         s += self.kind + " of the "
         s += self.subject.nameFull()
         if self.actors != []:
@@ -46,32 +46,38 @@ class Event:
         if self.subject.age < self.subject.culture.mythAge:
             s += "" + str(self.age) + " years ago, "
         else:
-            s += " before time, "
+            s += "Before time, "
         s += "the " + self.subject.nameFull()
-        s += " was "
+        if self.kind == "founding":
+            s += " was founded"
+            if len(self.actors) == 1:
+                s += " by the " + self.actors[0].nameFull()
+        if self.kind == "genesis":
+            s += " came into being"
         if self.kind == "birth":
-            s += "born"
+            s += " was born"
             if self.actors == []:
-                s += "."
+                s += ""
             elif len(self.actors) == 1:
-                s += " to the parent " + self.actors[0].nameFull()
+                s += " to the parent the " + self.actors[0].nameFull()
             else:
                 s += " to the parents "
-                s += self.actors[0].nameFull() + " and "
-                s += self.actors[1].nameFull() + "."
+                s += "the " + self.actors[0].nameFull() + " and "
+                s += "the " + self.actors[1].nameFull()
+        s += ".\n"
         if self.location != None:
             if self.location.city != None:
-                s += "\n" + "This happened at "
+                s += "This happened at "
                 c = self.location.city
                 s += c.name + ", the " + c.cType(c.population)
                 s += ", belonging to the " + c.culture.name + " " + c.culture.title+".\n"
-        elif self.location != None:
-            if self.subject.culture.name not in self.location.region.culturalNames:
-                s += "an unnamed " + self.location.region.biome
             else:
-                s += "the "
-                s += self.location.region.biome + " "
-                s += self.location.region.culturalNames[self.subject.culture.name]+".\n"
+                if self.subject.culture.name not in self.location.region.culturalNames:
+                    s += "an unnamed " + self.location.region.biome
+                else:
+                    s += "the "
+                    s += self.location.region.biome + " "
+                    s += self.location.region.culturalNames[self.subject.culture.name]+".\n"
         s += "This event is generally considered "
         if self.importance < 15:
             s += "unimportant"

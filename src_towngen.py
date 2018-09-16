@@ -25,12 +25,17 @@ def drawCircle(drawer,x,y,radius,color):
     y2 = y+radius
     drawer.ellipse([(x1,y1),(x2,y2)],color)
 
+def colAvg(c0,c1):
+    cc = (math.floor((c0[0]+c1[0])/2),math.floor((c0[1]+c1[1])/2),math.floor((c0[2]+c1[2])/2))
+    return cc
+
 class StreetNode:
     def __init__(self,coords):
         self.x = coords[0]
         self.y = coords[1]
         self.neighbors = []
         self.type = None
+        self.drawColor = (0,0,0)
     def dist(self,x,y):
         dx = abs(self.x-x)
         dy = abs(self.y-y)
@@ -78,9 +83,12 @@ class Block:
     def __init__(self,m):
         self.myTown = m
         self.verts = []
+        self.neighbors = []
         self.subblocks = []
         self.substreets = []
         self.type = None
+        self.node = None
+        self.col = (0,0,0)
     def centroid(self):
         if len(self.verts) != 0:
             xx = sum([n.x for n in self.verts])/len(self.verts)
@@ -109,6 +117,11 @@ class Block:
         dy = abs(self.y-y)
         dist = math.sqrt((dx**2) + (dy**2))
         return dist
+    def neighborize(self,j):
+        if j not in self.neighbors:
+            self.neighbors.append(j)
+        if self not in j.neighbors:
+            j.neighbors.append(j)
     def sharedNeighbors(self,f):
         s = 0
         for p in self.verts:
@@ -140,7 +153,9 @@ class Block:
         area = abs(area)
         self.area = area
         return area
-    def subdivide(self,size=1028):
+    def subdivide(self,size=1028,level=0):
+        if level > 5:
+            return -1
         a = self.polyArea()
         if self.area > size and len(self.verts) > 3:
             random.seed(self.area)
@@ -181,25 +196,23 @@ class Block:
                         pts1.append(p)
                 l0 = len(pts)+2
                 l1 = len(pts1)+2
-                if l0 > 3 and l1 > 3:
+                if l0 > 1 and l1 > 1:
                     sub = 1
-            ww = random.randint(2,7)
+            ww = random.randint(2,2)
             q = Street(div0,div1,ww)
             s = Block(self.myTown)
             s.verts = [div1,div0]
             s.verts.extend(pts)
-            s.subdivide(size)
+            s.subdivide(size,level+1)
             self.subblocks.append(s)
             s1 = Block(self.myTown)
             s1.verts = [div1,div0]
             s1.verts.extend(pts1)
-            s1.subdivide(size)
+            s1.subdivide(size,level+1)
             self.subblocks.append(s1)
             self.substreets.append(q)
     def drawSelf(self,drawer):
-        dCol = (0,0,0)
-        if self.type == "water":
-            dCol = (142,64,64)
+        dCol = self.col
         if len(self.verts) > 1:
             vts = [(p.x,p.y) for p in self.verts]
             drawer.polygon(vts,dCol,dCol)
@@ -218,7 +231,8 @@ class Town:
         self.yDim = 720
         self.landColor = self.myMap.biomeColors[self.node.biome]
         self.streetColor = (16,128,76)
-        cnt = 255
+        self.waterColor = (142,78,64)
+        cnt = 256
         sd = (self.node.x*73)+(self.node.y*37)
         random.seed(sd)
         verts = [[random.randint(0,self.xDim),random.randint(0,self.yDim)] for i in range(cnt)]
@@ -229,6 +243,7 @@ class Town:
         self.blocks = [Block(self) for i in primVor.regions]
         for i in range(len(self.blocks)):
             b = self.blocks[i]
+            b.col = self.landColor
             for j in range(len(primVor.regions[i])):
                 index = primVor.regions[i][j]
                 if index >= 0:
@@ -237,10 +252,14 @@ class Town:
         for i in range(len(primVor.ridge_vertices)):
             in0 = primVor.ridge_vertices[i][0]
             in1 = primVor.ridge_vertices[i][1]
-            newStreet = Street(self.streetNodes[in0],self.streetNodes[in1],7)
+            newStreet = Street(self.streetNodes[in0],self.streetNodes[in1],3)
             self.streets.append(newStreet)
-        self.population = self.node.city.population
-        self.radius = 32+(math.sqrt(self.population)*3)
+        if self.node.city != None:
+            self.population = self.node.city.population
+            self.radius = 32+(math.sqrt(self.population)*2)
+        else:
+            self.population = 0
+            self.radius = -8
         self.x = self.xDim/2
         self.y = self.yDim/2
         self.neighborPts = []
@@ -254,19 +273,24 @@ class Town:
             s = StreetNode([xx,yy])
             if n.river != None:
                 s.type = "river"
+                s.drawCol = self.waterColor
             if n.bodyWater != None:
                 s.type = "water"
-                self.radius *= 1.2
+                self.radius *= 1.15
+                s.drawCol = self.waterColor
+            else:
+                s.drawCol = colAvg(n.biomeColor,self.landColor)
             self.neighborPts.append(s)
         for p in self.neighborPts:
             if p.type == "river":
                 if self.node.river != None:
                     self.buildRiver(p,self.nearestBlock(self.x,self.y))
-            if p.type == "water":
+            else:
                 for k in range(len(self.blocks)):
                     kk = self.blocks[k].centroid()
                     if (self.blocks[k].blockDist(p.x,p.y) < self.x):
-                        self.blocks[k].type = "water"
+                        self.blocks[k].type = p.type
+                        self.blocks[k].col = p.drawCol
         self.outskirts = []
         for k in range(len(self.blocks)):
             if (self.blocks[k].blockDist(self.x,self.y) > self.radius
@@ -274,8 +298,14 @@ class Town:
                 self.outskirts.append(self.blocks[k])
         self.cullStreets(0)
         for i in self.blocks:
+            for j in self.blocks:
+                if i.sharedNeighbors(j) > 0:
+                    i.neighborize(j)
+        for i in self.blocks:
             if i not in self.outskirts:
-                i.subdivide(1600)
+                i.col = "black"
+                i.subdivide(800)
+        self.avgColors(3)
     def nearestBlock(self,xx,yy):
         d = self.xDim
         a = self.blocks[0]
@@ -291,6 +321,7 @@ class Town:
         by = b1.centroid()[1]
         while curr != b1:
             curr.type = "water"
+            curr.col = (142,78,64)
             t = curr
             d = self.xDim
             for f in self.blocks:
@@ -317,13 +348,28 @@ class Town:
                 k.exists = 1
             if k.length() < l:
                 k.cull()
+    def avgColors(self,count=1):
+        for u in range(count):
+            for i in self.blocks:
+                if i.col not in [self.waterColor,"black"]:
+                    c0 = i.col[0]
+                    c1 = i.col[1]
+                    c2 = i.col[2]
+                    pp = 1
+                    for j in i.neighbors:
+                        if j.col not in [self.waterColor,"black"]:
+                            c0 += j.col[0]
+                            c1 += j.col[1]
+                            c2 += j.col[2]
+                            pp += 1
+                    c0 = math.floor(c0/pp)
+                    c1 = math.floor(c1/pp)
+                    c2 = math.floor(c2/pp)
+                    i.col = (c0,c1,c2)
     def drawSelf(self,drawer):
         drawer.rectangle([(0,0),(self.xDim,self.yDim)],self.landColor,self.landColor)
         for k in self.blocks:
-            if k not in self.outskirts:
-                k.drawSelf(drawer)
-            elif k.type == "water":
-                k.drawSelf(drawer)
+            k.drawSelf(drawer)
         for s in self.streets:
             if s.exists == 1:
                 s.drawSelf(drawer,self.streetColor)

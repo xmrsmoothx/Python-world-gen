@@ -8,6 +8,8 @@ Created on Sat Mar  3 01:07:42 2018
 import random
 from src_tools import *
 from src_events import *
+import string
+import math
 
 class Item:
     def __init__(self,k,c,nn="",f=None,s=None,i=1,cr=None):
@@ -25,10 +27,13 @@ class Item:
         subname = ""
         if self.subject != None:
             if self.subject.tt == "event":
+                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*2)
                 subname = self.subject.note()
             if self.subject.tt == "pop":
+                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*2)
                 subname = "The " + self.subject.nameFull()
             if self.subject.tt == "item":
+                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*2)
                 t = ""
                 if self.subject.kind in ["book","story","piece"]:
                     t = "\""
@@ -83,9 +88,9 @@ class Item:
                 roll = random.random()
                 self.subkind = synonym(self.kind)
                 n = "the "
-                if roll > 0.35:
+                if roll > 0.3:
                     n += self.culture.language.genName()
-                elif roll > 0.65:
+                elif roll > 0.6:
                     n = self.culture.language.genName()
                 else:
                     n += self.subkind
@@ -96,7 +101,7 @@ class Item:
                         n += self.culture.language.genName()
         else:
             n = nn
-        self.name = n.title()
+        self.name = string.capwords(n)
     def justName(self):
         return self.name
     def nameFull(self):
@@ -125,7 +130,7 @@ class Item:
             self.material = synonym("paper",seedNum(self.name))
             s += "It is written on " + self.material
         elif self.subkind in ["tapestry","fresco","mural","painting","drawing"]:
-            self.material = synonym("paint",seedNum(self.name))
+            self.material = synonym("paint",seed=seedNum(self.name),exclusive=1)
             s += "It is painted with " + self.material + " paint"
         elif self.subkind in ["sculpture","statue","bust","gargoyle"]:
             self.material = synonym("stone",seedNum(self.name))
@@ -134,7 +139,7 @@ class Item:
             self.material = synonym("wood",seedNum(self.name))
             s += "It is made of " + self.material
         elif self.kind in ["weapon","helmet","bodice"]:
-            self.material = synonym("alloy",seedNum(self.name))
+            self.material = synonym("alloy",seed=seedNum(self.name))
             s += "It is made of " + self.material
         else:
             s += "It is made of mixed materials"
