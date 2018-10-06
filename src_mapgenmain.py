@@ -699,12 +699,12 @@ class Values:
         for q in self.influences.influenceOutput.keys():
             modifier = self.influences.influenceOutput[q]
             roll = random.random()
-            if roll > 0.99:
+            if roll > 0.97:
                 modifier = 8
-            elif roll < 0.01:
+            elif roll < 0.04:
                 modifier = 0.01
             for v in self.myMap.values[q].keys():
-                self.valuesOutput[v] += self.myMap.values[q][v]*modifier*random.uniform(0.8,1.25)
+                self.valuesOutput[v] += self.myMap.values[q][v]*modifier*random.uniform(0.7,1.4)
 
 class City:
     def __init__(self,n,pop=50,cltr=None,m=None):
@@ -762,7 +762,14 @@ class City:
         for p in self.node.entities:
             if p.kind == "army" and p.profession == "guard infantry":
                 q = p
-        garrtarget = math.floor(clamp(self.population*0.1,1,1+(2*(self.industrialProduction+self.foodProduction))))
+        garrmod = 1
+        if self.culture.society in ["Raiders","Pirates"]:
+            garrmod = 2
+        if self.culture.society in ["Shamanistic warriors","Religious zealots"]:
+            garrmod = 1.75
+        if self.culture.society in ["Hegemony","Empire","Imperium","Nation-state"]:
+            garrmod = 1.5
+        garrtarget = math.floor(clamp(self.population*0.1*garrmod,1,1+(2*(self.industrialProduction+self.foodProduction))))
         if q == None:
             q = Population(c=self.culture,n=None,t="",a=None,p=garrtarget,kind="army",node=self.node,prf="guard infantry")
             self.population = clamp(self.population-garrtarget,1,10000000)
@@ -823,7 +830,7 @@ class City:
         superRoll = 0.97
         m = self.culture.value.mainValues
         if "simplicity" in m:
-            self.threshold *= 0.5
+            self.threshold *= 0.7
             roll = roll/2
         if "travelers" in m:
             self.threshold *= 0.8
@@ -1270,7 +1277,7 @@ class Culture:
             self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount,kind=self.ppp,node=self.origin,prf="politician")
             if self.leaderCount == 1:
                 if self.society in ["Hegemony","Empire","Imperium","Monarchy"]:
-                    self.leader.name[1] = pp.name[1]
+                    self.leader.name = (self.leader.name[0],pp.name[1])
                     self.leader.parents.append(pp)
                 e = Event(self.myMap,a=self.leader.age,kind="birth",sub=self.leader,
                           actrs=self.leader.parents,loc=self.origin)
@@ -1301,34 +1308,36 @@ class Culture:
         m = self.value.mainValues
         if "warriors" in m and "collectivists" in m and "worshippers" in m:
             return "Hegemony"
-        if "greed" in m and "worshippers" in m and "builders" in m:
-            return "Empire"
-        if ("warriors" in m and "greed" in m and "builders" in m and 
-            ("freedom" in m or "travelers" in m or "sailors" in m)):
-            return "Imperium"
         if ("collectivists" in m and "worshippers" in m and 
             ("freedom" not in m and "materialists" not in m and "travelers" not in m)):
             return "Monarchy"
-        if "builders" in m and "collectivists" in m and "materialists" in m:
-            return "Socialists"
+        if "greed" in m and "worshippers" in m and "builders" in m:
+            return "Empire"
+        if "warriors" in m and "builders" in m and "worshippers" in m and "freedom" not in m and "traders" not in m:
+            return "Nation-state"
+        if ("warriors" in m and "greed" in m and "builders" in m and 
+            ("freedom" in m or "travelers" in m or "sailors" in m)):
+            return "Imperium"
         if "travelers" in m and "sailors" in m and "traders" in m:
             return "Traders"
         if "freedom" in m and "collectivists" in m and "simplicity" in m:
             return "Paleolithic tribe"
-        if ("travelers" in m or "sailors" in m) and ("traders" in m or "greed" in m) and "freedom" in m:
-            return "Independent merchants"
         if "collectivists" in m and "agriculture" in m and "materialists" in m:
-            return "Agricultural communists"
+            return "Agricultural commune"
         if "collectivists" in m and "agriculture" in m and "simplicity" in m:
             return "Farming commune"
         if "worshippers" in m and "warriors" in m and ("superstition" in m or "collectivists" in m):
             return "Religious zealots"
+        if ("freedom" in m and "materialists" in m and ("superstition" not in m and "shamans" not in m)):
+            return "Scholars"
         if ("materialists" in m and "astrology" in m and 
             ("superstition" not in m or "worshippers" not in m)):
             return "Astronomers"
         if ("shamans" in m and ("naturalists" in m or "astrology" in m or "simplicity") and 
             "superstition" in m):
             return "Shamanic tribe"
+        if "builders" in m and "collectivists" in m and "materialists" in m:
+            return "Socialists"
         if "shamans" in m and "warriors" in m and ("astrology" in m or "superstition" in m or "worshippers" in m):
             return "Shamanistic warriors"
         if "metallurgists" in m and "builders" in m and "craftsmen" in m and "materialists" in m:
@@ -1337,12 +1346,10 @@ class Culture:
             return "Merchant artisans"
         if "freedom" in m and "greed" in m and "traders" in m:
             return "Liberal capitalists"
-        if "freedom" in m and "traders" in m and ("builders" in m or "craftsmen" in m or "metallurgists" in m):
-            return "Liberal merchant-artisans"
         if "builders" in m and "agriculture" in m and "traders" in m:
             return "Mercantile folk"
         if "builders" in m and "agriculture" in m and ("travelers" in m or "sailors" in m):
-            return "Township builders"
+            return "Colonists"
         if ("craftsmen" in m or "metallurgy" in m or "builders" in m) and "simplicity" in m and ("naturalists" in m or "shamans" in m):
             return "Naturalist artisans"
         if ("craftsmen" in m or "metallurgy" in m or "builders" in m) and "simplicity" in m and ("superstition" in m or "astrology" in m):
@@ -1355,10 +1362,10 @@ class Culture:
             return "Scavengers"
         if "travelers" in m and "simplicity" in m and "freedom" in m:
             return "Hunter-gatherer tribe"
+        if ("travelers" in m or "sailors" in m) and ("traders" in m or "greed" in m) and "freedom" in m:
+            return "Independent merchants"
         if "astrology" in m and "superstition" in m and "worshippers" in m:
             return "Religious sovereignty"
-        if "collectivists" in m and "agriculture" in m and "naturalists" in m:
-            return "Agriculturalists"
         if "travelers" in m and "simplicity" in m and ("metallurgists" in m or "craftsmen" in m or "builders" in m):
             return "Nomadic artisans"
         if "travelers" in m and "simplicity" and ("naturalists" in m or "superstition" in m or "astrology" in m or "shamans" in m):
@@ -1370,85 +1377,117 @@ class Culture:
         if ("builders" in m and "metallurgists" in m and "craftsmen" in m and 
             "agriculture" in m and "collectivists" in m):
             return "Syndicalists"
-        if "warriors" in m and "builders" in m and ("worshippers" in m or "superstition" in m) and "freedom" not in m and "traders" not in m:
-            return "Nationalists"
+        if "freedom" in m and "traders" in m and ("builders" in m or "craftsmen" in m or "metallurgists" in m):
+            return "Liberal merchant-artisans"
         if "collectivists" in m and "freedom" in m:
-            return "Social Liberals"
-        if (("astrology" in m and "superstition" in m) or 
-            ("superstition" in m and "worshippers" in m) or
-            ("woshippers" in m and "astrology" in m)):
-            return "Religious sovereignty"
+            return "Social democracy"
         if "traders" in m and "freedom" in m:
             return "Merchants"
+        if "collectivists" in m and "worshippers" in m:
+            return "Religious collective"
         if "traders" in m and "collectivists" in m:
             return "Co-operative"
+        if "collectivists" in m and "agriculture" in m and "naturalists" in m:
+            return "Agricultural naturalists"
         if "traders" in m and "greed" in m:
             return "Capitalists"
         if "collectivists" in m:
             return "Communalists"
-        if ("freedom" in m and "materialists" in m and ("superstition" not in m and "shamans" not in m)):
-            return "Scholars"
         if "agriculture" in m and "worshippers" in m:
             return "Religious agriculturalists"
+        if (("astrology" in m and "superstition" in m) or 
+            ("superstition" in m and "worshippers" in m) or
+            ("woshippers" in m and "astrology" in m)):
+            return "Religious sovereignty"
         if "shamans" in m:
             return "Shamans"
         if "simplicity" in m:
             return "Tribe"
+        if "worshippers" in m and "superstition in m":
+            return "Religious sovereignty"
         if "freedom" in m:
             return "Liberals"
+        if "travelers" in m:
+            return "Nomads"
+        if "metallurgists" in m:
+            return "Blacksmiths"
+        if "craftsmen" in m:
+            return "Craftsmen"
+        if "greed" in m:
+            return "Capitalists"
+        if "warriors" in m:
+            return "Raiders"
         if "agriculture" in m:
             return "Agriculturalists"
-        if "worshippers" in m:
-            return "Religious sovereignty"
         return "Mixed society"
     def setTitle(self):
+        titleDict = dict.fromkeys(["Nation-state"],["Nation"])
+        titleDict.update(dict.fromkeys(["Religious sovereignty",
+                      "Religious zealots",
+                      "Religious agriculturalists",
+                      "Religious collective"],["Theocracy","Ecclesiarchy","Order","Caliphate"]))
+        titleDict.update(dict.fromkeys(["Agriculturalists",
+                       "Farming commune",
+                       "Agricultural commune",
+                       "Agricultural naturalists"],["Farmers","Yeomen","Peasants"]))
+        titleDict.update(dict.fromkeys(["Empire",
+                        "Hegemony",
+                        "Imperium"],["Empire"]))
+        titleDict.update(dict.fromkeys(["Monarchy"],["Kingdom"]))
+        titleDict.update(dict.fromkeys(["Nomadic artisans",
+                        "Nomads",
+                        "Scavengers",
+                        "Nomadic tribe"],["Nomads"]))
+        titleDict.update(dict.fromkeys(["Liberal capitalists",
+                         "Liberal merchant-artisans",
+                         "Merchant artisans",
+                         "Traders",
+                         "Independent merchants",
+                         "Mercantile folk",
+                         "Merchants",
+                         "Capitalists",
+                         "Colonists"],["Caravans","Proprietors","Holdings"]))
+        titleDict.update(dict.fromkeys(["Blacksmiths",
+                          "Traditionalist artisans",
+                          "Naturalist artisans",
+                          "Cooperative artisans",
+                          "Craftsmen"],["Artisans","Craftsmen"]))
+        titleDict.update(dict.fromkeys(["Socialists",
+                           "Syndicalists",
+                           "Revolutionary commune",
+                           "Communalists",
+                           "Co-operative"],["People's Union","Union","Collective"]))
+        titleDict.update(dict.fromkeys(["Shamanistic warriors",
+                            "Shamanic tribe",
+                            "Shamans"],["Mystics","Shamanate"]))
+        titleDict.update(dict.fromkeys(["Pirates",
+                             "Raiders"],["Brigands","Raiders"]))
+        titleDict.update(dict.fromkeys(["Social democracy",
+                              "Liberals"],["Republic"]))
+        titleDict.update(dict.fromkeys(["Scholars",
+                                        "Astronomers"],["Institute","Academy","College"]))
+        t = "People"
+        for h in titleDict.keys():
+            if h == self.society:
+                t = random.choice(titleDict[h])
         self.electionYear = 1000000
-        if self.society == "Nationalists":
-            return "Nation"
-        if (self.society == "Religious sovereignty" or self.society == "Religious zealots" or
-            self.society == "Religious agriculturalists"):
-            return random.choice(["Theocracy","Ecclesiarchy","Order"])
-        if self.society == "Agriculturalists" or self.society == "Farming commune" or self.society == "Agricultural communists":
-            return random.choice(["Farmers","Yeomen","Peasants"])
-        if self.society == "Imperium" or self.society == "Hegemony" or self.society == "Empire":
-            return "Empire"
-        if self.society == "Monarchy":
-            return "Kingdom"
-        if self.society == "Nomadic artisans" or self.society == "Nomadic peoples" or self.society == "Scavengers":
-            return "Nomads"
-        if (self.society == "Liberal capitalists" or self.society == "Liberal merchant-artisans" or self.society == "Merchant artisans" or 
-            self.society == "Traders" or self.society == "Independent merchants" or self.society == "Mercantile folk"
-            or self.society == "Merchants" or self.society == "Capitalists"):
-            return random.choice(["Caravans","Proprietors","Holdings"])
-        if (self.society == "Blacksmiths" or self.society == "Traditionalist artisans" or
-            self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
-            return "Artisans"
-        if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"
-            or self.society == "Communalists" or self.society == "Co-operative"):
+        if self.society in ["Socialists","Syndicalists","Revolutionary commune","Communalists","Co-operative"]:
             self.electionYear = random.randint(1,5)
-            return random.choice(["People's Union","Union","Collective"])
-        if (self.society == "Shamanistic warriors" or self.society == "Shamanic tribe"
-            or self.society == "Shamans"):
-            return "Mystics"
-        if self.society == "Pirates" or self.society == "Raiders":
-            return "Brigands"
-        if self.society == "Social Liberals" or self.society == "Liberals":
+        if self.society in ["Social democracy","Liberals"]:
             self.electionYear = random.randint(3,10)
-            return "Republic"
-        if self.society == "Scholars" or self.society == "Astronomers":
-            return random.choice(["Institute","Academy","College"])
-        return "People"
+        return t
     def setLeaderTitle(self):
         self.leaderCount = 1
         s2 = ""
-        if self.society == "Nationalists":
-            return (random.choice(["Master ","High ","Lord ",""]) +
+        if self.society == "Nation-state":
+            return (random.choice(["Supreme ","High ","Lord ",""]) +
                     random.choice(["Commissioner","Chancellor","Harbinger"]))
         if (self.society == "Religious sovereignty" or self.society == "Religious zealots" or
             self.society == "Religious agriculturalists"):
             return (random.choice(["Grand ","High ","Supreme ","Holy "]) +
                     random.choice(["Pontiff","Priest","Shepherd"]))
-        if self.society == "Agriculturalists" or self.society == "Farming commune" or self.society == "Agricultural communists":
+        if (self.society == "Agriculturalists" or self.society == "Farming commune" 
+            or self.society == "Agricultural commune" or self.society == "Agricultural naturalists"):
             self.leaderCount = random.choice([1,random.randint(2,10)])
             if self.leaderCount == 1:
                 s = ""
@@ -1461,12 +1500,12 @@ class Culture:
             return "Emperor"
         if self.society == "Monarchy":
             return "Monarch"
-        if self.society == "Nomadic artisans" or self.society == "Nomadic peoples" or self.society == "Scavengers":
+        if self.society == "Nomadic artisans" or self.society == "Nomads" or self.society == "Scavengers":
             return (random.choice(["Chief ","Head ","Elder "]) +
                     random.choice(["Captain","Dignitary","Herald"]))
         if (self.society == "Liberal capitalists" or self.society == "Liberal merchant-artisans" or self.society == "Merchant artisans" or 
             self.society == "Traders" or self.society == "Independent merchants" or self.society == "Mercantile folk"
-            or self.society == "Merchants" or self.society == "Capitalists"):
+            or self.society == "Merchants" or self.society == "Capitalists" or self.society == "Colonists"):
             self.leaderCount = random.choice([1,random.randint(2,10)])
             if self.leaderCount == 1:
                 s = ""
@@ -1475,8 +1514,7 @@ class Culture:
                 s2 = "s"
             return (s + random.choice(["Primary ","Head ","Chief ",""]) +
                     random.choice(["Executive","Director","Superintendent"]) + s2)
-        if (self.society == "Blacksmiths" or self.society == "Traditionalist artisans" or
-            self.society == "Naturalist artisans" or self.society == "Cooperative artisans"):
+        if (self.society in ["Blacksmiths","Traditionalist artisans","Naturalist artisans","Cooperative artisans","Craftsmen"]):
             self.leaderCount = random.choice([1,random.randint(2,10)])
             if self.leaderCount == 1:
                 s = ""
@@ -1486,7 +1524,7 @@ class Culture:
             return (s + random.choice(["Master ","Elder ","Grandmaster "]) +
                     random.choice(["Artificer","Builder","Craftsperson"]) + s2)
         if (self.society == "Socialists" or self.society == "Syndicalists" or self.society == "Revolutionary commune"
-            or self.society == "Communalists" or self.society == "Cooperative"):
+            or self.society == "Communalists" or self.society == "Co-operative"):
             self.leaderCount = random.choice([1,random.randint(2,20)])
             if self.leaderCount == 1:
                 s = ""
@@ -1501,7 +1539,7 @@ class Culture:
                     random.choice(["Medicine Man","Seer","Shaman"]))
         if self.society == "Pirates" or self.society == "Raiders":
             return (random.choice(["Chief ","Head ",""]) +
-                    random.choice(["Captain","Commander",""]))
+                    random.choice(["Captain","Commander","Warlord"]))
         if self.society == "Scholars" or self.society == "Astronomers":
             self.leaderCount = random.choice([1,random.randint(2,10)])
             if self.leaderCount == 1:
@@ -1511,7 +1549,7 @@ class Culture:
                 s2 = "s"
             return (s + random.choice(["Master ","Elder ","Grandmaster ",""]) +
                     random.choice(["Dean","Chancellor","Professor"]) + s2)
-        if self.society == "Social Liberals" or self.society == "Liberals":
+        if self.society == "Social democracy" or self.society == "Liberals":
             self.leaderCount = random.choice([1,1,random.randint(2,10)])
             if self.leaderCount == 1:
                 s = ""
@@ -1732,7 +1770,7 @@ class Population:
         else:
             self.name = (n,"")
         if a == None:
-            self.age = random.randint(23,45)
+            self.age = random.randint(23,50)
         else:
             self.age = a
         if t != "":
@@ -1901,7 +1939,9 @@ class Population:
     def agePop(self,scl):
         self.stamina = 1
         self.age += scl
-        self.importance = self.importance*1.005
+        self.importance = self.importance*1.002
+        if self.dead == 1:
+            return -1
         if random.random() > 0.93:
             self.createWork()
         if self.age > self.culture.oldAge and self.immortal == 0:
@@ -2410,7 +2450,7 @@ class Map:
     def infoScales(self):
         self.distScale = 12
         self.eScale = random.randint(2000,3000)
-        self.tempScale = 105
+        self.tempScale = 73
         self.rainfallScale = 1756
         self.fertScale = 100
         self.metalScale = 140000
@@ -2723,29 +2763,29 @@ class Map:
                               "warriors":0}
         self.values = {}
         self.values["swimming"] = {"simplicity":0.2,
-                   "sailors":0.8,
+                   "sailors":0.2,
                    "astrology":0.15,
                    "freedom":0.45,
-                   "warriors":0.05}
+                   "warriors":0.4}
         self.values["food"] = {"agriculture":-0.1,
                    "greed":-0.25,
                    "materialists":0.55,
                    "collectivists":0.25,
                    "simplicity":0.45,
-                   "worshippers":-0.2,
+                   "worshippers":-0.1,
                    "superstition":-0.2,
                    "traders":0.2,
-                   "warriors":0.2,
+                   "warriors":0.3,
                    "builders":0.25}
         self.values["darkness"] = {"travelers":0.2,
                    "collectivists":-0.4,
                    "superstition":0.7,
-                   "greed":0.5,
+                   "greed":0.55,
                    "astrology":0.25,
                    "materialists":-0.15,
                    "shamans":0.15,
                    "freedom":-0.1,
-                   "warriors":0.55,
+                   "warriors":0.75,
                    "worshippers":0.4}
         self.values["movement"] = {"travelers":0.8,
                    "sailors":0.2,
@@ -2757,8 +2797,8 @@ class Map:
                    "freedom":0.85,
                    "naturalists":0.2,
                    "collectivists":-0.2,
-                   "warriors":0.2,
-                   "greed":0.1}
+                   "warriors":0.4,
+                   "greed":0.2}
         self.values["plantlife"] = {"agriculture":0.25,
                    "greed":0.15,
                    "naturalists":0.25,
@@ -2768,28 +2808,28 @@ class Map:
                    "builders":0.4,
                    "simplicity":-0.25,
                    "collectivists":0.15}
-        self.values["nature"] = {"naturalists":0.35,
+        self.values["nature"] = {"naturalists":0.45,
                    "shamans":0.2,
                    "agriculture":0.25,
                    "freedom":0.15,
                    "travelers":0.15,
-                   "simplicity":0.45,
+                   "simplicity":0.35,
                    "collectivists":0.2,
                    "superstition":0.3,
                    "astrology":0.1,
                    "metallurgists":0.4,
-                   "warriors":0.05,
+                   "warriors":0.2,
                    "worshippers":0.15}
         self.values["growth"] = {"shamans":0.1,
                    "agriculture":0.55,
                    "naturalists":0.45,
                    "metallurgists":-0.2,
                    "freedom":0.15,
-                   "astrology":-0.3,
+                   "astrology":-0.2,
                    "collectivists":0.4,
                    "materialists":-0.1,
-                   "warriors":0.15,
-                   "builders":0.15,
+                   "warriors":0.25,
+                   "builders":0.2,
                    "greed":0.1,
                    "worshippers":0.1}
         self.values["sky"] = {"travelers":0.55,
@@ -2804,8 +2844,8 @@ class Map:
                    "simplicity":0.4,
                    "builders":0.1}
         self.values["constellations"] = {"astrology":0.6,
-                   "superstitious":0.1,
-                   "worshippers":0.25,
+                   "superstition":0.25,
+                   "worshippers":0.3,
                    "freedom":0.15,
                    "materialists":-0.15,
                    "shamans":0.15}
@@ -2815,21 +2855,21 @@ class Map:
                    "materialists":0.75,
                    "agriculture":0.25,
                    "collectivists":0.4,
-                   "builders":0.6,
+                   "builders":0.65,
                    "freedom":-0.15,
-                   "worshippers":-0.15,
+                   "worshippers":-0.1,
                    "greed":0.4,
-                   "superstition":-0.25,
-                   "warriors":0.1,
+                   "superstition":-0.2,
+                   "warriors":0.4,
                    "astrology":-0.2}
         self.values["fields"] = {"agriculture":0.75,
                    "builders":0.3,
                    "materialists":0.5,
                    "naturalists":0.35,
-                   "superstition":-0.3,
+                   "superstition":-0.25,
                    "simplicity":-0.3,
                    "collectivists":0.25,
-                   "warriors":0.05,
+                   "warriors":0.3,
                    "freedom":0.1,
                    "astrology":0.1}
         self.values["sunlight"] = {"worshippers":0.9,
@@ -2839,18 +2879,18 @@ class Map:
                    "simplicity":0.75,
                    "freedom":0.6,
                    "materialists":-0.2,
-                   "warriors":0.3,
+                   "warriors":0.5,
                    "builders":-0.1}
-        self.values["ice"] = {"superstition":0.2,
+        self.values["ice"] = {"superstition":0.25,
                    "simplicity":-0.4,
                    "freedom":-0.4,
                    "travelers":-0.45,
-                   "materialists":0.45,
+                   "materialists":0.4,
                    "sailors":0.1,
                    "shamans":0.45,
-                   "greed":0.4,
+                   "greed":0.45,
                    "metallurgists":0.3,
-                   "warriors":0.4,
+                   "warriors":0.55,
                    "agriculture":-0.2,
                    "collectivists":0.05}
         self.values["fear"] = {"superstition":0.75,
@@ -2859,28 +2899,28 @@ class Map:
                    "freedom":-0.3,
                    "collectivists":0.3,
                    "simplicity":-0.3,
-                   "builders":0.3,
-                   "greed":0.7,
+                   "builders":0.4,
+                   "greed":0.75,
                    "materialists":-0.25,
-                   "warriors":0.6,
+                   "warriors":0.9,
                    "astrology":0.2}
         self.values["death"] = {"freedom":0.15,
                    "collectivists":-0.15,
-                   "warriors":0.6,
-                   "greed":0.15,
+                   "warriors":0.65,
+                   "greed":0.25,
                    "travelers":0.15,
                    "builders":-0.1,
                    "simplicity":-0.1,
                    "materialists":0.2}
-        self.values["water"] = {"sailors":2,
+        self.values["water"] = {"sailors":1,
                    "simplicity":0.3,
                    "freedom":0.75,
                    "travelers":0.6,
-                   "builders":0.15,
+                   "builders":0.2,
                    "craftsmen":0.1,
                    "astrology":0.45,
                    "traders":0.75,
-                   "warriors":0.15}
+                   "warriors":0.25}
     def influences(self):
         self.influenceOutputs = {"sky":0,
                                  "sunlight":0,
@@ -3045,7 +3085,7 @@ class Map:
                        "earth":0.2,
                        "food":-0.3,
                        "plantlife":-0.2,
-                       "fear":0.2,
+                       "fear":0.25,
                        "darkness":0.2,
                        "fields":0.15,
                        "water":0.1,

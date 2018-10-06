@@ -18,12 +18,23 @@ def clamp(x,minimum,maximum):
     else:
         return x
 
+def exclus(g):
+    if g < 0.01 and g > 0:
+        return 0.01
+    elif g > -0.01 and g < 0:
+        return -0.01
+    return g
+
 def drawCircle(drawer,x,y,radius,color):
     x1 = x-radius
     x2 = x+radius
     y1 = y-radius
     y2 = y+radius
     drawer.ellipse([(x1,y1),(x2,y2)],color)
+
+def enorm(a,b):
+    j = abs(a**2) + abs(b**2)
+    return math.sqrt(j)
 
 def colAvg(c0,c1):
     cc = (math.floor((c0[0]+c1[0])/2),math.floor((c0[1]+c1[1])/2),math.floor((c0[2]+c1[2])/2))
@@ -67,7 +78,7 @@ class Street:
         self.width = w
     def streetDist(self,x,y):
         d = (self.nodes[0].dist(x,y)+self.nodes[1].dist(x,y))/2
-        return d
+        return abs(d)
     def length(self):
         return self.nodes[0].dist(self.nodes[1].x,self.nodes[1].y)
     def cull(self):
@@ -103,11 +114,16 @@ class Block:
         # Return 1 if p1 is counterclockwise from p0 with c as center; otherwise, return 0
         cx = c[0]
         cy = c[1]
-        v0x = p0.x-cx
-        v0y = p0.y-cy
-        v1x = p1.x-cx
-        v1y = p1.y-cy
-        if v0y*v1x > v0x*v1y:
+        v0 = (p0.x-cx,p0.y-cy)
+        v1 = (p1.x-cx,p1.y-cy)
+        d0 = enorm(v0[0],v0[1])
+        d1 = enorm(v1[0],v1[1])
+        dp = (v0[0]*v1[0]) + (v0[1]*v1[1])
+        if d0*d1 == 0:
+            return 0
+        q = clamp(dp/exclus(d0*d1),-1,1)
+        ang = math.acos(q)
+        if ang >= 0:
             return 1
         else:
             return 0
@@ -135,22 +151,22 @@ class Block:
                 aa = j
                 bb = (j+1) % n
                 if self.ccw(self.verts[aa],self.verts[bb],self.centroid()) == 0:
+                    # bb not ccw from aa
                     t = self.verts[aa]
                     self.verts[aa] = self.verts[bb]
                     self.verts[bb] = t
+        self.verts = list(reversed(self.verts))
     def polyArea(self):
+        if len(self.verts) < 1:
+            self.area = 0
+            return 0
         self.orderccw()
-        n = len(self.verts)
         area = 0
-        for i in range(n):
-            j = (i+1) % n
-            aa = self.verts[i]
-            bb = self.verts[j]
-            yy = (aa.y+bb.y)/2
-            xx = (aa.x-bb.x)
-            zz = xx*yy
-            area += zz
-        area = abs(area)
+        q = self.verts[-1]
+        for p in self.verts:
+            area += (p.x * q.y) - (p.y * q.x)
+            q = p
+        area = abs(area/2)
         self.area = area
         return area
     def subdivide(self,size=1028,level=0):
@@ -217,6 +233,7 @@ class Block:
             vts = [(p.x,p.y) for p in self.verts]
             drawer.polygon(vts,dCol,dCol)
         for k in self.subblocks:
+            k.col = self.col
             k.drawSelf(drawer)
         for k in self.substreets:
             k.drawSelf(drawer,self.myTown.streetColor)
@@ -232,7 +249,7 @@ class Town:
         self.landColor = self.myMap.biomeColors[self.node.biome]
         self.streetColor = (16,128,76)
         self.waterColor = (142,78,64)
-        cnt = 256
+        cnt = 128
         sd = (self.node.x*73)+(self.node.y*37)
         random.seed(sd)
         verts = [[random.randint(0,self.xDim),random.randint(0,self.yDim)] for i in range(cnt)]
@@ -292,6 +309,7 @@ class Town:
                         self.blocks[k].type = p.type
                         self.blocks[k].col = p.drawCol
         self.outskirts = []
+        self.cullStreets(0)
         for k in range(len(self.blocks)):
             if (self.blocks[k].blockDist(self.x,self.y) > self.radius
                 or self.blocks[k].type == "water"):
@@ -304,7 +322,14 @@ class Town:
         for i in self.blocks:
             if i not in self.outskirts:
                 i.col = "black"
-                i.subdivide(800)
+                i.subdivide(1024)
+        minsize = 1024
+        for i in self.blocks:
+            for j in i.subblocks:
+                if j.polyArea() < minsize and i not in self.outskirts:
+                    j.col = self.streetColor
+            if i.polyArea() < minsize and i not in self.outskirts:
+                i.col = self.streetColor
         self.avgColors(3)
     def nearestBlock(self,xx,yy):
         d = self.xDim
@@ -351,13 +376,13 @@ class Town:
     def avgColors(self,count=1):
         for u in range(count):
             for i in self.blocks:
-                if i.col not in [self.waterColor,"black"]:
+                if i.col not in [self.waterColor,self.streetColor,"black"]:
                     c0 = i.col[0]
                     c1 = i.col[1]
                     c2 = i.col[2]
                     pp = 1
                     for j in i.neighbors:
-                        if j.col not in [self.waterColor,"black"]:
+                        if j.col not in [self.waterColor,self.streetColor,"black"]:
                             c0 += j.col[0]
                             c1 += j.col[1]
                             c2 += j.col[2]
