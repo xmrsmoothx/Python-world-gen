@@ -220,6 +220,7 @@ class Node:
         self.rSlope = self.slope*self.slopeDir
         return self.rSlope
     def waterdist(self,sealevel):
+        self.getSlope()
         if self.x < 0 or self.y < 0 or self.x > 960 or self.y > 960:
             self.waterdistance = 16
         elif self.watery() == 1 or self.river != None:
@@ -228,7 +229,7 @@ class Node:
             self.waterdistance = 1
         else:
             dd = [n.waterdistance for n in self.neighbors]
-            self.waterdistance = min(dd) + 1 + (random.random()*0.5)
+            self.waterdistance = min(dd) + 1 + (random.random()*0.4) + clamp(self.slope*100,0,1)
     def smooth(self):
         nbrs = []
         nbrs.append(self.elevation)
@@ -355,12 +356,13 @@ class Node:
         
 
 class Triangle:
-    def __init__(self,aa,bb,cc):
+    def __init__(self,aa,bb,cc,m):
         self.verts = [None,None,None]
         self.verts[0] = aa
         self.verts[1] = bb
         self.verts[2] = cc
         self.neighbors = []
+        self.myMap = m
     def sharesNeighbors(self,other):
         shares = 0
         if self.verts[0] in other.verts:
@@ -445,7 +447,7 @@ class Triangle:
     def drawReal(self,drawer,sl):
         elevationList = [self.verts[f].elevation for f in range(len(self.verts))]
         elevation = sum(elevationList)/3
-        col = math.floor(elevation*255)
+        col = math.floor(((elevation*255)+64)/2)
         underwater = 0
         avgHue = math.floor(sum([self.verts[f].biomeColor[0] for f in range(len(self.verts))])/3)
         avgSat = math.floor(sum([self.verts[f].biomeColor[1] for f in range(len(self.verts))])/3)
@@ -455,7 +457,8 @@ class Triangle:
             if f.watery() == 1:
                 underwater = 1
         if underwater == 1:
-            dCol = (142,128,clamp(col,44,84))
+            v = clamp(col,self.myMap.waterValueMin,self.myMap.waterValueMax)
+            dCol = (self.myMap.waterHue,self.myMap.waterSaturation,v)
         drawer.polygon([self.verts[0].coords(),self.verts[1].coords(),self.verts[2].coords()],fill=dCol,outline=dCol)
 
 class River:
@@ -469,7 +472,13 @@ class River:
             choice = current
             m = 1000
             for k in current.neighbors:
-                if (k.elevation < m and k.elevation >= current.elevation):
+                kr = 0
+                if k.river != None and k.river != self:
+                    kr = 1
+                for q in k.neighbors:
+                    if q.river != None and q.river != self:
+                        kr = 1
+                if (k.elevation < m and k.elevation >= current.elevation and kr == 0):
                     choice = k
                     m = k.elevation
             if choice == current:
@@ -495,13 +504,13 @@ class River:
     def drawRiver(self,drawer,xDim):
         for l in self.nodes:
             l.getSlope()
-        dCol = (142,128,76)
+        dCol = (self.landmass.myMap.waterHue,self.landmass.myMap.waterSaturation,self.landmass.myMap.waterValueMax)
         for i in range(len(self.nodes)-1):
             n = self.nodes[i]
             n1 = self.nodes[i+1]
             scale = xDim/2
-            w = clamp(1/n.slope,0,2048)/scale
-            w1 = clamp(1/n1.slope,0,2048)/scale
+            w = clamp((1/n.slope)/scale,1,2048)
+            w1 = clamp((1/n1.slope)/scale,1,2048)
             drawCircle(drawer,n.x,n.y,w,dCol)
             drawCircle(drawer,n1.x,n1.y,w1,dCol)
             drawTrapezoid(drawer,n.x,n.y,n1.x,n1.y,w,w1,dCol)
@@ -526,8 +535,9 @@ class bodyWater:
                     self.addNode(k)
 
 class Landmass:
-    def __init__(self,rootNode,sLevel):
-        self.sealevel = sLevel
+    def __init__(self,rootNode,m):
+        self.myMap = m
+        self.sealevel = self.myMap.sealevel
         self.color = self.landmassColor()
         self.root = rootNode
         self.nodes = []
@@ -814,7 +824,7 @@ class City:
         mpc = mpc/math.sqrt(self.culture.tech["government"])
         self.foodConsumption = mpc*self.population
         diff = self.foodProduction-self.foodConsumption
-        growth = clamp(diff/mpc,-self.population*0.1,self.population*0.1)
+        growth = clamp(diff/mpc,-self.population*0.12,self.population*0.06)
         if self.population < 20:
             growth = clamp(growth,1,100)
         self.population = math.ceil(self.population*0.99)  # Age related death
@@ -824,7 +834,7 @@ class City:
         for r in self.roads:
             r.build()
     def diaspora(self):
-        self.threshold = 1000*(0.99**self.age)
+        self.threshold = 1500*(0.99**self.age)
         roll = random.random()
         minRoll = 0.7
         superRoll = 0.97
@@ -854,7 +864,7 @@ class City:
             self.migrate()
     def migrate(self):
         emigrants = math.ceil(self.population*random.uniform(0.1,0.5))
-        rng = 64
+        rng = 96
         xx = clamp(self.node.x + random.randint(-rng,rng),16,self.myMap.xDim)
         yy = clamp(self.node.y + random.randint(-rng,rng),16,self.myMap.yDim)
         n = self.myMap.nearestNode(xx,yy)
@@ -1248,18 +1258,18 @@ class Culture:
                     multiplier = multiplier*1.3
             if "simplicity" in m:
                 multiplier = multiplier*0.5
-            if self.society in ["Paleolithic tribe","Hunter-gatherer tribe"]:
-                multiplier = multiplier*0.3
+            if "tribe" in self.society:
+                multiplier = multiplier*0.2
             if self.society == "Scholars":
                 if t == "research" or t == "philosophy":
                     multiplier = multiplier*1.4
             if self.society == "Blacksmiths":
                 if t == "metallurgy":
                     multiplier = multiplier*1.2
-            if "artisans" in self.society:
+            if "artisan" in self.society:
                 if t == "production":
                     multiplier = multiplier*1.2
-            if "agriculturalists" in self.society:
+            if "agricultur" in self.society:
                 if t == "agriculture":
                     multiplier = multiplier*1.3
             multiplier = multiplier*(self.tech["research"]**0.3333)
@@ -1712,7 +1722,7 @@ class Culture:
         s += "Capital: " + self.origin.city.name + "\n\n"
         for k in self.tech.keys():
             lv = self.tech[k]
-            lvl = ((2**(lv-4))/((2**(lv-4))+1))*6.05
+            lvl = ((2**((1.2*lv)-2))/((2**((1.2*lv)-2))+3))*(5.8*(1.002**lv))-0.4
             if abs(round(lvl)-lvl) > 0.35:
                 ss = " ~= "
             elif round(lvl) > lvl:
@@ -2148,11 +2158,11 @@ class Population:
             s += " defensive power is approximately equal to "
             s += str(self.power[1]) + " men.\n"
         s += self.pronouns[self.gender].capitalize() + " is generally considered "
-        if self.importance < 10:
+        if self.importance < 15:
             s += "unimportant"
-        elif self.importance < 25:
+        elif self.importance < 30:
             s += "important"
-        elif self.importance < 50:
+        elif self.importance < 60:
             s += "extremely important"
         else:
             s += "legendary"
@@ -2542,7 +2552,7 @@ class Map:
     def buildLandmass(self,root):
         if root.landmass != None or root.watery() == 1:
             return -1
-        root.landmass = Landmass(root,self.sealevel)
+        root.landmass = Landmass(root,self)
         self.landmasses.append(root.landmass)
     def buildAllLand(self):
         print("Building landmasses...")
@@ -2668,7 +2678,7 @@ class Map:
         for p in self.atlas:
             p.getSlope()
     def waterdistances(self):
-        self.wdmax = 14
+        self.wdmax = 20
         for i in range(self.wdmax):
             for p in self.atlas:
                 p.waterdist(self.sealevel)
@@ -2678,7 +2688,10 @@ class Map:
     def rainfall(self):
         for p in self.atlas:
             rainfall = 0.4*random.uniform(0.95,1.05)
-            rainfall = ((rainfall*(0.5-((p.temp*0.7)+(p.elevation*0.5)+(0.8*(p.waterdistance+2)/(self.wdmax+2)))))+rainfall)/2
+            rainfall = ((rainfall*(0.5-((p.temp*0.7)+(p.elevation*0.5)+(0.8*(p.waterdistance+1)/(self.wdmax+1)))))+rainfall)/2
+            for n in p.neighbors:
+                if n.river != None:
+                    rainfall = rainfall*1.4
             if p.river != None:
                 rainfall = rainfall*1.5
             for l in p.neighbors:
@@ -2742,6 +2755,10 @@ class Map:
         bColors["mountain"] = (134,0,96)
         bColors["water"] = (142,78,64)
         self.biomeColors = bColors
+        self.waterHue = 142
+        self.waterSaturation = 128
+        self.waterValueMin = 44
+        self.waterValueMax = 84
     def values(self):
         self.valuesOutputs = {"travelers":0,
                               "craftsmen":0,
@@ -3104,8 +3121,8 @@ class Map:
         self.technologies["philosophy"] = 1
         self.technologies["medicine"] = 1
         self.techtiers = ["primitive","bronze age",
-                           "classical period","medieval","industrial",
-                           "modern","space-age","galactic"]
+                           "classical period","medieval","pre-industrial",
+                           "industrial","contemporary"]
         # e.g. "medieval humanity", "classical period humanity"
     def godSpheres(self):
         s0 = list(self.influences.keys())
@@ -3595,7 +3612,7 @@ triIndex = 0
 print("Building triangles...")
 while triIndex < len(trisList):
     triVertsIndices = trisList[triIndex]
-    newTri = Triangle(atlas[triVertsIndices[0]],atlas[triVertsIndices[1]],atlas[triVertsIndices[2]])
+    newTri = Triangle(atlas[triVertsIndices[0]],atlas[triVertsIndices[1]],atlas[triVertsIndices[2]],world)
     triangles.append(newTri)
     triIndex += 1
 
@@ -3632,8 +3649,8 @@ world.influences()
 world.values()
 world.godSpheres()
 world.technologies()
-world.scatterCities(random.randint(14,18))
-world.scatterBeasts(random.randint(16,24))
+world.scatterCities(random.randint(8,16))
+world.scatterBeasts(random.randint(8,24))
 print("Drawing map...")
 root = Tk()
 world.drawReal(root)

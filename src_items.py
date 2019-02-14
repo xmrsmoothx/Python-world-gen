@@ -164,11 +164,11 @@ class Item:
                 q = "engraving"
             s += "The subject of the " + q + " is the " + self.subject.nameFull() + ".\n"
         s += "It is generally considered "
-        if self.importance < 10:
+        if self.importance < 12:
             s += "unimportant"
-        elif self.importance < 20:
+        elif self.importance < 25:
             s += "important"
-        elif self.importance < 40:
+        elif self.importance < 50:
             s += "extremely important"
         else:
             s += "legendary"
