@@ -118,7 +118,7 @@ class noiseMaker:
         return tileVal/(initialSize*2)
     
 class Node:
-    def __init__(self,xx,yy):
+    def __init__(self,xx,yy,m=None):
         self.x = xx
         self.y = yy
         self.neighbors = []
@@ -135,6 +135,8 @@ class Node:
         self.key = 0
         self.roads = []
         self.entities = []
+        self.myMap=m
+        self.name = str((xx+(yy*1028)))
     def coords(self):
         tupleVert = (self.x,self.y)
         return tupleVert
@@ -353,6 +355,13 @@ class Node:
             for n in self.neighbors:
                 if n.landmass == self.landmass:
                     drawer.line([self.coords(),n.coords()],dCol,3)
+    def drawTownGen(self):
+        self.townGen = Town(self,self.myMap,self.name)
+        townImg = Image.new("HSV",(self.townGen.xDim,self.townGen.yDim),(0,0,255))
+        graphDraw = ImageDraw.Draw(townImg)
+        self.townGen.drawSelf(graphDraw)
+        townImg = townImg.convert("RGB")
+        townImg.save(self.townGen.mapName,"GIF")
         
 
 class Triangle:
@@ -556,7 +565,7 @@ class Landmass:
         yTotal = sum([p.y for p in self.nodes])
         xx = xTotal/self.size
         yy = yTotal/self.size
-        self.centroid = Node(xx,yy)
+        self.centroid = Node(xx,yy,world)
     def lType(self,s):
         if s <= 6:
             t = "islet"
@@ -1029,13 +1038,6 @@ class City:
             self.drawCity(drawer,self.node.x,self.node.y,col,out)
         else:
             self.drawMetropolis(drawer,self.node.x,self.node.y,col,out)
-    def drawTownGen(self):
-        self.townGen = Town(self.node,self.myMap,self.name)
-        townImg = Image.new("HSV",(self.townGen.xDim,self.townGen.yDim),(0,0,255))
-        graphDraw = ImageDraw.Draw(townImg)
-        self.townGen.drawSelf(graphDraw)
-        townImg = townImg.convert("RGB")
-        townImg.save(self.townGen.mapName,"GIF")
     def cityNotes(self):
         s = self.name + " ("
         s += self.cType(self.population) + ")\n\n"
@@ -2379,7 +2381,7 @@ class Map:
             ny = 0
         else:
             ny = self.yDim
-        self.north = Node(nx,ny)
+        self.north = Node(nx,ny,world)
     def nodeLat(self,n):
         return "Latitude: " + str(round(n.y/self.distScale))
     def nodeLong(self,n):
@@ -2512,7 +2514,7 @@ class Map:
             return self.atlas[0]
         n = self.cities[0].node
         minDist = 1000000
-        search = Node(xx,yy)
+        search = Node(xx,yy,world)
         for p in self.cities:
             dist = search.dist(p.node)
             if dist < minDist:
@@ -2595,7 +2597,7 @@ class Map:
         for l in self.landmasses:
             l.cullStreams(self.n/32)
     def addSineHill(self,xx,yy,maximum=0.25,radius=128):
-        hillCenter = Node(xx,yy)
+        hillCenter = Node(xx,yy,world)
         for p in self.atlas:
             dist = p.dist(hillCenter)
             if dist <= radius:
@@ -2604,7 +2606,7 @@ class Map:
                     multiplier = multiplier*((1-p.elevation)**2)
                 p.elevation = p.elevation+(maximum*multiplier)
     def addHill(self,xx,yy,maximum=0.25,radius=128):
-        hillCenter = Node(xx,yy)
+        hillCenter = Node(xx,yy,world)
         for p in self.atlas:
             dist = p.dist(hillCenter)
             if dist <= radius:
@@ -3134,7 +3136,7 @@ class Map:
             return self.xDim
         else:
             c = self.nearestCity(xx,yy).node
-            d = Node(xx,yy).dist(c)
+            d = Node(xx,yy,world).dist(c)
             return d
     def placeCity(self,xx,yy,pop=50,culture=None,node=None):
         if node != None:
@@ -3214,7 +3216,7 @@ class Map:
         self.displayString.set(self.nodeInfo(clickedNode))
         self.displayNo = clickedNode
         cityNode = self.nearestCity(event.x,event.y)
-        if cityNode.node.dist(Node(event.x,event.y)) < 8:
+        if cityNode.node.dist(Node(event.x,event.y,world)) < 8:
             self.displayString.set(self.nodeInfo(cityNode.node))
             self.displayNo = cityNode.node
     def redraw(self):
@@ -3450,9 +3452,7 @@ class Map:
     def cityInfo(self):
         if self.displayNo == None:
             return -1
-        if self.displayNo.city == None:
-            return -1
-        self.displayCity = self.displayNo.city
+        self.displayCity = self.displayNo
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
@@ -3464,9 +3464,10 @@ class Map:
         self.townLbl.photo = photo
         self.townLbl.pack()
         self.cityString = StringVar()
-        self.cityString.set(self.displayCity.cityNotes())
-        cdsc = Label(self.infoGui,textvariable=self.cityString)
-        cdsc.pack()
+        if self.displayNo.city != None:
+            self.cityString.set(self.displayCity.city.cityNotes())
+            cdsc = Label(self.infoGui,textvariable=self.cityString)
+            cdsc.pack()
         self.displayCulture = self.displayNo.culture
         b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
         b1.pack(anchor=S,side=BOTTOM,expand=YES,fill=BOTH)
@@ -3551,7 +3552,7 @@ class Map:
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "medium aquamarine"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b3 = Button(gui,text="Settlement Info",command=self.cityInfo)
+            b3 = Button(gui,text="Location Info",command=self.cityInfo)
             b3.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "aquamarine"
             b3.config(bg=c1,activebackground=c1,activeforeground=c1)
@@ -3584,7 +3585,7 @@ print("Generating points...")
 for x in range(numNodes-4):
     nodeX = random.random()*mapDimX
     nodeY = random.random()*mapDimY
-    newNode = Node(nodeX,nodeY)
+    newNode = Node(nodeX,nodeY,world)
     atlas.append(newNode)
 
 npFloatAtlas = np.zeros((numNodes,2))

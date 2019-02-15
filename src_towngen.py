@@ -169,74 +169,11 @@ class Block:
         area = abs(area/2)
         self.area = area
         return area
-    def subdivide(self,size=1028,level=0):
-        if level > 5:
-            return -1
-        a = self.polyArea()
-        if self.area > size and len(self.verts) > 3:
-            random.seed(self.area)
-            sub = 0
-            div0 = None
-            div1 = None
-            pts = []
-            pts1 = []
-            while sub == 0:
-                base0 = random.choice(self.verts)
-                nbr0 = random.choice(base0.neighbors)
-                while nbr0 not in self.verts:
-                    nbr0 = random.choice(base0.neighbors)
-                div0 = StreetNode(base0.midpt(nbr0))
-                s = Street(div0,nbr0)
-                s = Street(div0,base0)
-                base1 = random.choice(self.verts)
-                nbr1 = random.choice(base1.neighbors)
-                while nbr1 not in self.verts:
-                        nbr1 = random.choice(base1.neighbors)
-                div1 = StreetNode(base1.midpt(nbr1))
-                while div1 == div0:
-                    base1 = random.choice(self.verts)
-                    nbr1 = random.choice(base1.neighbors)
-                    while nbr1 not in self.verts:
-                        nbr1 = random.choice(base1.neighbors)
-                    div1 = StreetNode(base1.midpt(nbr1))
-                s = Street(div1,nbr1)
-                s = Street(div1,base1)
-                c = div0.midpt(div1)
-                pts = []
-                for p in self.verts:
-                    if self.ccw(div1,p,c) == 0 and self.ccw(div0,p,c) == 1:
-                        pts.append(p)
-                pts1 = []
-                for p in self.verts:
-                    if p not in pts:
-                        pts1.append(p)
-                l0 = len(pts)+2
-                l1 = len(pts1)+2
-                if l0 > 1 and l1 > 1:
-                    sub = 1
-            ww = random.randint(2,2)
-            q = Street(div0,div1,ww)
-            s = Block(self.myTown)
-            s.verts = [div1,div0]
-            s.verts.extend(pts)
-            s.subdivide(size,level+1)
-            self.subblocks.append(s)
-            s1 = Block(self.myTown)
-            s1.verts = [div1,div0]
-            s1.verts.extend(pts1)
-            s1.subdivide(size,level+1)
-            self.subblocks.append(s1)
-            self.substreets.append(q)
     def drawSelf(self,drawer):
         dCol = self.col
         if len(self.verts) > 1:
             vts = [(p.x,p.y) for p in self.verts]
             drawer.polygon(vts,dCol,dCol)
-        for k in self.subblocks:
-            k.col = self.col
-            k.drawSelf(drawer)
-        for k in self.substreets:
-            k.drawSelf(drawer,self.myTown.streetColor)
 
 class Town:
     def __init__(self,n,m,nom):
@@ -249,7 +186,7 @@ class Town:
         self.landColor = self.myMap.biomeColors[self.node.biome]
         self.streetColor = (16,128,76)
         self.waterColor = (142,78,64)
-        cnt = 128
+        cnt = 256
         sd = (self.node.x*73)+(self.node.y*37)
         random.seed(sd)
         verts = [[random.randint(0,self.xDim),random.randint(0,self.yDim)] for i in range(cnt)]
@@ -309,27 +246,14 @@ class Town:
                         self.blocks[k].type = p.type
                         self.blocks[k].col = p.drawCol
         self.outskirts = []
-        self.cullStreets(0)
         for k in range(len(self.blocks)):
             if (self.blocks[k].blockDist(self.x,self.y) > self.radius
                 or self.blocks[k].type == "water"):
                 self.outskirts.append(self.blocks[k])
-        self.cullStreets(0)
         for i in self.blocks:
             for j in self.blocks:
                 if i.sharedNeighbors(j) > 0:
                     i.neighborize(j)
-        for i in self.blocks:
-            if i not in self.outskirts:
-                i.col = "black"
-                i.subdivide(1024)
-        minsize = 1024
-        for i in self.blocks:
-            for j in i.subblocks:
-                if j.polyArea() < minsize and i not in self.outskirts:
-                    j.col = self.streetColor
-            if i.polyArea() < minsize and i not in self.outskirts:
-                i.col = self.streetColor
         self.avgColors(3)
     def nearestBlock(self,xx,yy):
         d = self.xDim
@@ -358,21 +282,6 @@ class Town:
                 return -1
             else:
                 curr = t
-    def cullStreets(self,l):
-        for k in self.streets:
-            k.exists = 0
-            q = 0
-            f = 0
-            for b in self.blocks:
-                if b not in self.outskirts:
-                    if k.nodes[0] in b.verts:
-                        q = 1
-                    if k.nodes[1] in b.verts:
-                        f = 1
-            if q == 1 and f == 1:
-                k.exists = 1
-            if k.length() < l:
-                k.cull()
     def avgColors(self,count=1):
         for u in range(count):
             for i in self.blocks:
@@ -395,9 +304,6 @@ class Town:
         drawer.rectangle([(0,0),(self.xDim,self.yDim)],self.landColor,self.landColor)
         for k in self.blocks:
             k.drawSelf(drawer)
-        for s in self.streets:
-            if s.exists == 1:
-                s.drawSelf(drawer,self.streetColor)
         scl = 8
         h = self.yDim/scl
         w = self.xDim/scl
