@@ -565,7 +565,7 @@ class Landmass:
         yTotal = sum([p.y for p in self.nodes])
         xx = xTotal/self.size
         yy = yTotal/self.size
-        self.centroid = Node(xx,yy,world)
+        self.centroid = Node(xx,yy,self.myMap)
     def lType(self,s):
         if s <= 6:
             t = "islet"
@@ -1208,8 +1208,8 @@ class Culture:
         self.tech = {}
         self.items = []
         for k in list(self.myMap.technologies.keys()):
-            self.tech[k] = 1
-        for p in range(24):
+            self.tech[k] = 1+(0.2*random.random())
+        for p in range(50):
             self.updateTech()
         self.unitcount = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     def happiness(self):
@@ -1449,7 +1449,7 @@ class Culture:
         titleDict.update(dict.fromkeys(["Nomadic artisans",
                         "Nomads",
                         "Scavengers",
-                        "Nomadic tribe"],["Nomads"]))
+                        "Nomadic tribe"],["Nomads","Pilgrims","Travelers"]))
         titleDict.update(dict.fromkeys(["Liberal capitalists",
                          "Liberal merchant-artisans",
                          "Merchant artisans",
@@ -1691,7 +1691,6 @@ class Culture:
         for d in self.deities:
             if self.deities.index(d) != 0:
                 s += "\n\n"
-            s += "[" + str(self.deities.index(d)) + "]     "
             if d.age > self.myMap.age:
                 s += "Since the beginning of time, "
             else:
@@ -1725,12 +1724,22 @@ class Culture:
         for k in self.tech.keys():
             lv = self.tech[k]
             lvl = ((2**((1.2*lv)-2))/((2**((1.2*lv)-2))+3))*(5.8*(1.002**lv))-0.4
-            if abs(round(lvl)-lvl) > 0.35:
-                ss = " ~= "
-            elif round(lvl) > lvl:
-                ss = " >= "
+            testlvl = abs(round(lvl))
+            lvldiff = abs(testlvl-lvl)
+            if lvl > testlvl:
+                if lvldiff > 0.32:
+                    ss = " > "
+                elif lvldiff > 0.13:
+                    ss = " >= "
+                else:
+                    ss = " ~= "
             else:
-                ss = " <= "
+                if lvldiff > 0.32:
+                    ss = " < "
+                elif lvldiff > 0.13:
+                    ss = " <= "
+                else:
+                    ss = " ~= "
             lvl = math.floor(lvl)
             s += "" + k
             s += "" + ss
@@ -2212,7 +2221,6 @@ class Flag:
         self.yDim = 192
         self.colors = []
         self.newColor()
-        self.genFlag()
     def newColor(self):
         h = random.randint(0,255)
         s = random.randint(0,255)
@@ -2381,7 +2389,7 @@ class Map:
             ny = 0
         else:
             ny = self.yDim
-        self.north = Node(nx,ny,world)
+        self.north = Node(nx,ny,self)
     def nodeLat(self,n):
         return "Latitude: " + str(round(n.y/self.distScale))
     def nodeLong(self,n):
@@ -2514,7 +2522,7 @@ class Map:
             return self.atlas[0]
         n = self.cities[0].node
         minDist = 1000000
-        search = Node(xx,yy,world)
+        search = Node(xx,yy,self)
         for p in self.cities:
             dist = search.dist(p.node)
             if dist < minDist:
@@ -2680,7 +2688,7 @@ class Map:
         for p in self.atlas:
             p.getSlope()
     def waterdistances(self):
-        self.wdmax = 20
+        self.wdmax = 16
         for i in range(self.wdmax):
             for p in self.atlas:
                 p.waterdist(self.sealevel)
@@ -2690,7 +2698,7 @@ class Map:
     def rainfall(self):
         for p in self.atlas:
             rainfall = 0.4*random.uniform(0.95,1.05)
-            rainfall = ((rainfall*(0.5-((p.temp*0.7)+(p.elevation*0.5)+(0.8*(p.waterdistance+1)/(self.wdmax+1)))))+rainfall)/2
+            rainfall = ((rainfall*(0.5-((p.temp*0.8)+(p.elevation*0.3)+(0.7*(p.waterdistance+1)/(self.wdmax+1)))))+rainfall)/2
             for n in p.neighbors:
                 if n.river != None:
                     rainfall = rainfall*1.4
@@ -2701,13 +2709,15 @@ class Map:
                     rainfall *= 1.25
             p.rainfall = clamp(rainfall,0,1)
         for p in self.atlas:
-            p.rainfall = sum([n.rainfall for n in p.neighbors])/len(p.neighbors)
+            lst = [n.rainfall for n in p.neighbors]
+            lst.append(p.rainfall)
+            p.rainfall = sum(lst)/len(lst)
     def temperature(self):
         for p in self.atlas:
             s = self.seasonStrength
             seasonMod = clamp(1+(math.sin((math.pi*self.date)/2)*s),1-s,1+s)
-            latTemp = 0.6*(p.dist(self.north)/self.xDim)
-            elevationTemp = 0.3*(1-p.elevation)
+            latTemp = 0.7*(p.dist(self.north)/self.xDim)
+            elevationTemp = 0.2*(1-p.elevation)
             p.temp = clamp(seasonMod*(elevationTemp+latTemp),0,1)
     def soilProperties(self):
         for p in self.atlas:
@@ -3136,7 +3146,7 @@ class Map:
             return self.xDim
         else:
             c = self.nearestCity(xx,yy).node
-            d = Node(xx,yy,world).dist(c)
+            d = Node(xx,yy,self).dist(c)
             return d
     def placeCity(self,xx,yy,pop=50,culture=None,node=None):
         if node != None:
@@ -3150,9 +3160,13 @@ class Map:
             return -1
     def randomCity(self):
         cityNode = random.choice(self.atlas)
+        tries = 16
+        q = 0
         while (cityNode.biome == "water" or cityNode.city != None or
                cityNode.x < 32 or cityNode.x > self.xDim-32 or cityNode.y < 32 
-               or cityNode.y > self.yDim-32 or self.nearestCityDist(cityNode.x,cityNode.y) < 32):
+               or cityNode.y > self.yDim-32 or self.nearestCityDist(cityNode.x,cityNode.y) < 32
+               or (cityNode.hasWaterNeighbor(self.sealevel) == 0 and q < tries)):
+            q = q+1
             cityNode = random.choice(self.atlas)
         newCity = City(cityNode,pop=random.randint(12,136),m=self)
     def scatterCities(self,n):
@@ -3216,7 +3230,7 @@ class Map:
         self.displayString.set(self.nodeInfo(clickedNode))
         self.displayNo = clickedNode
         cityNode = self.nearestCity(event.x,event.y)
-        if cityNode.node.dist(Node(event.x,event.y,world)) < 8:
+        if cityNode.node.dist(Node(event.x,event.y,self)) < 8:
             self.displayString.set(self.nodeInfo(cityNode.node))
             self.displayNo = cityNode.node
     def redraw(self):
@@ -3410,6 +3424,7 @@ class Map:
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
+        self.displayCulture.flag.genFlag()
         photo = Image.open(self.displayCulture.flag.filename)
         self.flagImg = ImageTk.PhotoImage(photo)
         self.flagLbl = Label(self.infoGui,image=self.flagImg)
@@ -3552,7 +3567,7 @@ class Map:
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "medium aquamarine"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-            b3 = Button(gui,text="Location Info",command=self.cityInfo)
+            b3 = Button(gui,text="Area Info",command=self.cityInfo)
             b3.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "aquamarine"
             b3.config(bg=c1,activebackground=c1,activeforeground=c1)

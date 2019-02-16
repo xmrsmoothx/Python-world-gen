@@ -186,7 +186,7 @@ class Town:
         self.landColor = self.myMap.biomeColors[self.node.biome]
         self.streetColor = (16,128,76)
         self.waterColor = (142,78,64)
-        cnt = 256
+        cnt = 512
         sd = (self.node.x*73)+(self.node.y*37)
         random.seed(sd)
         verts = [[random.randint(0,self.xDim),random.randint(0,self.yDim)] for i in range(cnt)]
@@ -254,7 +254,7 @@ class Town:
             for j in self.blocks:
                 if i.sharedNeighbors(j) > 0:
                     i.neighborize(j)
-        self.avgColors(3)
+        self.avgColors(6)
     def nearestBlock(self,xx,yy):
         d = self.xDim
         a = self.blocks[0]
@@ -268,9 +268,11 @@ class Town:
         curr = self.nearestBlock(n0.x,n0.y)
         bx = b1.centroid()[0]
         by = b1.centroid()[1]
+        q = 0
         while curr != b1:
+            q = q+1
             curr.type = "water"
-            curr.col = (142,78,64)
+            curr.col = self.waterColor
             t = curr
             d = self.xDim
             for f in self.blocks:
@@ -278,7 +280,7 @@ class Town:
                 and f.blockDist(bx,by) < d):
                     d = f.blockDist(bx,by)
                     t = f
-            if t == curr:
+            if t == self.nearestBlock(self.xDim/2,self.yDim/2) or q > 100:
                 return -1
             else:
                 curr = t
