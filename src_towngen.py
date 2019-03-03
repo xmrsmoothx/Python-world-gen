@@ -233,7 +233,8 @@ class Town:
                 self.radius *= 1.15
                 s.drawCol = self.waterColor
             else:
-                s.drawCol = colAvg(n.biomeColor,self.landColor)
+                s.drawCol = n.myMap.biomeColors[n.biome]
+                #s.drawCol = colAvg(n.myMap.biomeColors[n.biome],self.landColor)
             self.neighborPts.append(s)
         for p in self.neighborPts:
             if p.type == "river":
@@ -245,6 +246,14 @@ class Town:
                     if (self.blocks[k].blockDist(p.x,p.y) < self.x):
                         self.blocks[k].type = p.type
                         self.blocks[k].col = p.drawCol
+        for b in self.blocks:
+            for f in self.blocks:
+                if (b.sharedNeighbors(f) >= 2 and
+                    b.type == "water"):
+                    f.col = self.waterColor
+        for f in self.blocks:
+            if f.col == self.waterColor:
+                f.type = "water"
         self.outskirts = []
         for k in range(len(self.blocks)):
             if (self.blocks[k].blockDist(self.x,self.y) > self.radius
@@ -281,7 +290,7 @@ class Town:
                     d = f.blockDist(bx,by)
                     t = f
             if t == self.nearestBlock(self.xDim/2,self.yDim/2) or q > 100:
-                return -1
+                curr = b1
             else:
                 curr = t
     def avgColors(self,count=1):

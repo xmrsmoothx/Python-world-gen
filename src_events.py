@@ -59,9 +59,9 @@ class Event:
             if self.actors == []:
                 s += ""
             elif len(self.actors) == 1:
-                s += " to the parent the " + self.actors[0].nameFull()
+                s += " to "+self.subject.possessive[self.subject.gender]+" parent the " + self.actors[0].nameFull()
             else:
-                s += " to the parents "
+                s += " to "+self.subject.possessive[self.subject.gender]+" parents "
                 s += "the " + self.actors[0].nameFull() + " and "
                 s += "the " + self.actors[1].nameFull()
         s += ".\n"
