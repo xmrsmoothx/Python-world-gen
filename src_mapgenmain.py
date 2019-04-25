@@ -363,6 +363,7 @@ class Node:
         graphDraw = ImageDraw.Draw(townImg)
         self.townGen.drawSelf(graphDraw)
         townImg = townImg.convert("RGB")
+        fileName = ("./generated/"+self.townGen.mapName)
         townImg.save(self.townGen.mapName,"GIF")
         
 
@@ -1704,7 +1705,7 @@ class Culture:
         img = Image.new('HSV',(res,res),(255,0,255))
         drawer = ImageDraw.Draw(img)
         self.cultureFace.drawSelf(drawer)
-        filename = "face_" + self.name + ".gif"
+        filename = "./generated/face_" + self.name + ".gif"
         img = img.convert('RGB')
         img.save(filename,"GIF")
         return filename
@@ -2296,7 +2297,7 @@ class Flag:
             if element == "circ":
                 self.addCirc(drawer)
         drawer.line(self.corners+[(0,0)],fill=(0,0,0),width=8)
-        self.filename = "flag_" + self.culture.name + ".gif"
+        self.filename = "./generated/flag_" + self.culture.name + ".gif"
         img = img.convert('RGB')
         img.save(self.filename,"GIF")
 
@@ -3608,7 +3609,7 @@ class Map:
             desc = Label(gui,textvariable=self.displayString)
             desc.pack(anchor=W,side=RIGHT)
             visualAtlas = visualAtlas.convert("RGB")
-            self.mapname = "map_" + self.cultures[0].language.genName() + ".gif"
+            self.mapname = "./generated/map_" + self.cultures[0].language.genName() + ".gif"
             visualAtlas.save(self.mapname,"GIF")
             photo = Image.open(self.mapname)
             self.img = ImageTk.PhotoImage(photo)
