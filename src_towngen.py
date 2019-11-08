@@ -9,6 +9,7 @@ import numpy as np
 import random
 import math
 from scipy.spatial import Voronoi
+from src_tools import *
 
 def clamp(x,minimum,maximum):
     if x < minimum:
@@ -180,12 +181,12 @@ class Town:
         self.myMap = m
         self.node = n
         self.name = nom
-        self.mapName = "town_"+self.name+".gif"
+        self.mapName = "./generated/town_"+self.name+".gif"
         self.xDim = 720
         self.yDim = 720
         self.landColor = self.myMap.biomeColors[self.node.biome]
-        self.streetColor = (16,128,76)
-        self.waterColor = (142,78,64)
+        self.streetColor = Tools.streetColor
+        self.waterColor = Tools.waterColor
         cnt = 512
         sd = (self.node.x*73)+(self.node.y*37)
         random.seed(sd)
@@ -311,10 +312,14 @@ class Town:
                     c1 = math.floor(c1/pp)
                     c2 = math.floor(c2/pp)
                     i.col = (c0,c1,c2)
+    def drawRoads(self,drawer):
+        dCol = Tools.streetColor
+        drawCircle(drawer,self.xDim/2,self.yDim/2,3,dCol)
     def drawSelf(self,drawer):
         drawer.rectangle([(0,0),(self.xDim,self.yDim)],self.landColor,self.landColor)
         for k in self.blocks:
             k.drawSelf(drawer)
+        self.drawRoads(drawer)
         scl = 8
         h = self.yDim/scl
         w = self.xDim/scl

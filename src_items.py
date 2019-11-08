@@ -37,7 +37,7 @@ class Item:
                 t = ""
                 if self.subject.kind in ["book","story","piece"]:
                     t = "\""
-                subname = t + self.subject.name + t
+                subname = t + self.subject.name.title().capitalize() + t
         if nn == "":
             n = random.choice(["a ","the "])
             if self.kind == "book":
@@ -101,7 +101,7 @@ class Item:
                         n += self.culture.language.genName()
         else:
             n = nn
-        self.name = string.capwords(n)
+        self.name = string.capwords(n).title()
     def justName(self):
         return self.name
     def nameFull(self):
@@ -132,14 +132,14 @@ class Item:
         elif self.subkind in ["tapestry","fresco","mural","painting","drawing"]:
             self.material = synonym("paint",seed=seedNum(self.name),exclusive=1)
             s += "It is painted with " + self.material + " paint"
-        elif self.subkind in ["sculpture","statue","bust","gargoyle"]:
+        elif self.subkind in ["sculpture","statue","bust","etching"]:
             self.material = synonym("stone",seedNum(self.name))
             s += "It is made of " + self.material
         elif self.subkind in ["woodcut"]:
             self.material = synonym("wood",seedNum(self.name))
             s += "It is made of " + self.material
         elif self.kind in ["weapon","helmet","bodice"]:
-            self.material = synonym("alloy",seed=seedNum(self.name))
+            self.material = synonym("metal",seed=seedNum(self.name))
             s += "It is made of " + self.material
         else:
             s += "It is made of mixed materials"
@@ -154,7 +154,8 @@ class Item:
             s += "It is an object "
         if self.field != None:
             if self.kind in ["story","book","piece"]:
-                s += "dealing with " + self.field
+                addition = synonym("about")
+                s += addition + " " + self.field
             else:
                 s += "decorated with imagery related to " + self.field
             s += ".\n"

@@ -49,7 +49,7 @@ class Face:
         self.nosewidth = 0.15*self.xDim*random.uniform(0.7,1)*(math.sqrt(clamp(humidity,0.1,0.5)))
         self.lipthickness = clamp(0.2*self.xDim*random.uniform(0.8,1.2)*clamp(humidity,0.1,0.5)*clamp(hotness,0.1,0.7),self.xDim/24,self.xDim/7)
         self.lipwidth = self.lipthickness*3*random.uniform(0.7,1.3)
-        self.melanin = clamp(254-(210*random.uniform(0.9,1.1)*(1.1-latitude)),42,250)
+        self.melanin = clamp(254-(210*random.uniform(0.9,1.1)*(1.1-latitude)),42,230)
         self.skincolor = (math.floor(random.uniform(0.9,1.1)*14),clamp(math.floor(random.uniform(0.8,1.3)*(20+self.melanin)),24,200),clamp(math.floor(random.uniform(1,1.1)*(255-self.melanin)),32,250))
         self.shadowcolor = (self.skincolor[0],self.skincolor[1],math.floor(self.skincolor[2]*0.65))
         self.haircolor = (math.floor(random.uniform(0.8,1.4)*24),math.floor(random.uniform(0.9,1.1)*50),math.floor(random.uniform(0.9,1.1)*self.melanin))
