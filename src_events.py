@@ -71,6 +71,8 @@ class Event:
         if self.kind == "election":
             s += " was elected to the leadership of the " + self.subject.culture.shortName()
             s += " during the election of " + str(self.year)
+        if self.kind == "death":
+            s += " died."
         s += ".\n"
         if self.location != None:
             s += "This happened at "

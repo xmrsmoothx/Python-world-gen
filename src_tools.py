@@ -81,6 +81,7 @@ def synonym(x,seed=0,exclusive=0):
     s["fear"] = ["fear","terror","dread","anxiety"]
     s["warriors"] = ["warriors","fighters","soldiers"]
     s["traders"] = ["traders","merchants","sellers","brokers"]
+    s["travelers"] = ["travelers","wanderers","nomads","migrants","itinerants"]
     s["agriculture"] = ["agriculture","farming","irrigation","crops","cultivation"]
     s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
     s["village"] = ["village","hamlet"]
@@ -134,7 +135,7 @@ def synonym(x,seed=0,exclusive=0):
     s["guard infantry"] = ["guard infantry","garrison","sentinels","defensive brigade","guardsmen","reserve"]
     s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carbiners"]
     s["siege"] = ["siege","siege towers","battering rams","demolitionists","blockades","sappers"]
-    s["about"] = ["about","dealing with","related to","explaining","questioning","investigating","on"]
+    s["about"] = ["about","dealing with","related to","explaining","questioning","investigating","on","concerning"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)

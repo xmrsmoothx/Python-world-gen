@@ -1207,7 +1207,7 @@ class Culture:
             self.ppp = "group"
         self.leader = Population(self,t=self.leaderTitle,p=self.leaderCount,kind=self.ppp,node=self.origin,prf="politician")
         self.totalPop = self.populationCount()
-        self.oldAge = 75
+        self.oldAge = 65
         self.tech = {}
         self.items = []
         for k in list(self.myMap.technologies.keys()):
@@ -1264,7 +1264,7 @@ class Culture:
             if "simplicity" in m:
                 multiplier = multiplier*0.8
             if "tribe" in self.society:
-                multiplier = multiplier*0.3
+                multiplier = multiplier*0.5
             if self.society == "Scholars":
                 multiplier = multiplier*1.1
                 if t == "research" or t == "philosophy":
@@ -1289,8 +1289,6 @@ class Culture:
                 if self.populations[f].kind == "beast":
                     self.populations[f].meander()
                 self.populations[f].agePop(self.myMap.timeScale)
-        for d in self.deities:
-            d.agePop(self.myMap.timeScale)
         if self.leader == None or self.leader.number == 0:
             pp = self.leader
             parens = []
@@ -1596,7 +1594,7 @@ class Culture:
         man = math.floor(random.uniform(0,100))
         woman = math.floor(random.uniform(0,100))
         nb = math.floor(random.uniform(0,100))
-        self.genderSpread = [1 for n in range(man)]+[1 for n in range(woman)]+[1 for n in range(nb)]
+        self.genderSpread = [1 for n in range(man)]+[2 for n in range(woman)]+[3 for n in range(nb)]
     def generateMythology(self):
         self.deities = []
         m = self.value.mainValues
@@ -2012,13 +2010,13 @@ class Population:
             return -1
         if random.random() > 0.9:
             self.createWork()
-        if self.age > self.culture.oldAge and self.immortal == 0:
-            if random.random() < (0.1*self.number):
+        if (self.age > self.culture.oldAge or random.random() > 0.99) and self.immortal == 0:
+            if random.random() < (0.1*self.number) or self.number == 1 :
                 roll = self.number-(self.number*0.9*(random.random()))
                 if self.number > 1:
                     self.number = math.ceil(self.number-(self.number*0.9*(random.random())))
                 else:
-                    if roll < 0.95:
+                    if roll < 0.2:
                         self.number = 0
         if self.number == 0:
             self.die()
@@ -2038,6 +2036,9 @@ class Population:
         n = math.floor(n)
         self.number = clamp(self.number-n,0,self.number)
     def die(self):
+        if self.importance > 3:
+            e = Event(m=self.culture.myMap,a=0,kind="death",sub=self,loc=self.location)
+            e.importance = ((self.importance*(self.culture.oldAge/self.age))+self.importance)/2
         if self.location != None:
             if self in self.location.entities:
                 self.location.entities.remove(self)
@@ -2067,7 +2068,7 @@ class Population:
             t = random.choice(["event","event","event","event","event","pop","pop","item","item"])
         if t == "event":
             e = random.choice(self.culture.myMap.events)
-            while ((e.subject.culture != self.culture and random.random() < 0.98-(e.importance/200)) 
+            while ((e.subject.culture != self.culture and random.random() < 0.98-(e.importance/300))
                 or (e.subject.culture == self.culture and random.random() < 0.75-(e.importance/100))):
                 e = random.choice(self.culture.myMap.events)
             subj = e
@@ -2144,6 +2145,7 @@ class Population:
             s += synonym(self.associations[0],seedNum(self.name[0]))
             if self.associations[0] == "mountain":
                 s += "s"
+            s += " from the " + self.culture.name + " culture"
         if self.kind == "person":
             s += "person from the "
             s += self.culture.name + " culture"
@@ -3487,12 +3489,13 @@ class Map:
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "SteelBlue4"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-    def cultureInfo(self):
+    def cultureInfo(self,reset=False):
         if self.displayNo == None:
             return -1
         if self.displayNo.culture == None:
             return -1
-        self.displayCulture = self.displayNo.culture
+        if reset == True:
+            self.displayCulture = self.displayNo.culture
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
@@ -3662,6 +3665,7 @@ class Map:
             c1 = "firebrick4"
             b6.config(bg=c1,activebackground=c1,activeforeground=c1)
             b1 = Button(gui,text="Society Info",command=self.cultureInfo)
+            b1.configure(command = lambda self=self: self.cultureInfo(reset=True))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "medium aquamarine"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)

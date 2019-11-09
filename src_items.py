@@ -22,6 +22,7 @@ class Item:
         self.importance = i
         self.creator = cr
         self.subkind = None
+        self.decoration = None
         if self.kind == "piece":
             self.subkind = synonym("piece")
         subname = ""
@@ -129,6 +130,7 @@ class Item:
             ["concerto","song","sonnet","ballad"]):
             self.material = synonym("paper",seedNum(self.name))
             s += "It is written on " + self.material
+            s += " in the " + self.culture.name + " language"
         elif self.subkind in ["tapestry","fresco","mural","painting","drawing"]:
             self.material = synonym("paint",seed=seedNum(self.name),exclusive=1)
             s += "It is painted with " + self.material + " paint"
@@ -143,6 +145,8 @@ class Item:
             s += "It is made of " + self.material
         else:
             s += "It is made of mixed materials"
+        if self.decoration != None:
+            s += " and decorated with " + self.decoration
         s += ".\n"
         if self.kind == "story":
             s += "It is fiction "
@@ -163,7 +167,10 @@ class Item:
             q = "work"
             if self.kind in ["helmet","weapon","bodice"]:
                 q = "engraving"
-            s += "The subject of the " + q + " is the " + self.subject.nameFull() + ".\n"
+            try:
+                s += "The subject of the " + q + " is the " + self.subject.culture.name + " " + self.subject.nameFull() + ".\n"
+            except AttributeError: 
+                s += "The subject of the " + q + " is the " + self.subject.nameFull() + ".\n"
         s += "It is generally considered "
         if self.importance < 12:
             s += "unimportant"
