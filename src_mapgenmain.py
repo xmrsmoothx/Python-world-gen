@@ -228,32 +228,32 @@ class Node:
     def setBiome(self,sl):
         if self.elevation > 0.864:
                 self.biome = "mountain"
-        elif self.temp < 0.17:
-            if self.rainfall < 0.15:
+        elif self.temp < 0.18:
+            if self.rainfall < 0.2:
                 self.biome = "frost"
-            elif self.rainfall < 0.35:
-                self.biome = "tundra"
-            elif self.rainfall < 0.43:
+            elif self.rainfall < 0.36:
+                self.biome = "frost"
+            elif self.rainfall < 0.55:
                 self.biome = "shrubland"
             else:
                 self.biome = "boreal forest"
-        elif self.temp < 0.33:
-            if self.rainfall < 0.06:
+        elif self.temp < 0.34:
+            if self.rainfall < 0.2:
                 self.biome = "tundra"
-            elif self.rainfall < 0.11:
+            elif self.rainfall < 0.3:
                 self.biome = "shrubland"
-            elif self.rainfall < 0.36:
+            elif self.rainfall < 0.5:
                 self.biome = "boreal forest"
             else:
                 self.biome = "forest"
-        elif self.temp < 0.57:
-            if self.rainfall < 0.03:
+        elif self.temp < 0.58:
+            if self.rainfall < 0.04:
                 self.biome = "desert"
-            elif self.rainfall < 0.06:
+            elif self.rainfall < 0.1:
                 self.biome = "savanna"
-            elif self.rainfall < 0.10:
+            elif self.rainfall < 0.2:
                 self.biome = "shrubland"
-            elif self.rainfall < 0.3:
+            elif self.rainfall < 0.6:
                 self.biome = "forest"
             else:
                 self.biome = "tropical forest"
@@ -429,6 +429,10 @@ class Triangle:
         if underwater == 1:
             v = 32
         dCol = (h,s,v)
+        tt = [x.resourceRegion for x in self.verts]
+        cc = max(set(tt),key=tt.count)
+        if cc != None:
+            dCol = (0,0,0)
         drawer.polygon([self.verts[0].coords(),self.verts[1].coords(),self.verts[2].coords()],fill=dCol,outline=dCol)
     def drawReal(self,drawer,sl):
         elevationList = [self.verts[f].elevation for f in range(len(self.verts))]
@@ -737,10 +741,8 @@ class City:
         self.culture = None
         if cltr == None:
             self.culture = Culture(self.node,m)
-            self.culture.cities.append(self)
         else:
             self.culture = cltr
-            self.culture.cities.append(self)
         self.name = self.culture.language.genName()
         self.cityType = self.cType(self.population)
         self.region = self.node.region
@@ -766,6 +768,8 @@ class City:
         self.kind = "city"
         e = Event(self.culture.myMap,a=self.age,kind="founding",sub=self,actrs=[self.culture.leader])
         e.importance = random.randint(10,40)+clamp(math.floor(math.sqrt(self.population)),0,25)
+    def distanceToCity(self,other):
+        return self.node.dist(other.node)
     def happiness(self):
         h = 1
         h = h-(math.log10(self.population)/100)
@@ -786,12 +790,12 @@ class City:
                 q = p
         garrmod = 1
         if self.culture.society in ["Raiders","Pirates"]:
-            garrmod = 2
+            garrmod = 1.6
         if self.culture.society in ["Shamanistic warriors","Religious zealots"]:
-            garrmod = 1.75
+            garrmod = 1.4
         if self.culture.society in ["Hegemony","Empire","Imperium","Nation-state"]:
-            garrmod = 1.5
-        garrtarget = math.floor(clamp(self.population*0.1*garrmod,1,1+(2*(self.industrialProduction+self.foodProduction))))
+            garrmod = 1.2
+        garrtarget = math.floor(clamp(self.population*0.08*garrmod,1,1+(2*(self.industrialProduction+self.foodProduction))))
         if q == None:
             q = Population(c=self.culture,n=None,t="",a=None,p=garrtarget,kind="army",node=self.node,prf="guard infantry")
             self.population = clamp(self.population-garrtarget,1,10000000)
@@ -806,17 +810,19 @@ class City:
         mpo = random.uniform(0.097,0.101)   # Maximum personal output (max resources production per person)
         m = self.culture.value.mainValues
         if "agriculture" in m:
-            mpo *= 1.1
+            mpo *= 1.07
         if "simplicity" in m:
             mpo *= 0.85
         if "warriors" in m:
-            mpo *= 1.05
+            mpo *= 1.04
         if "builders" in m:
-            mpo *= 1.05
+            mpo *= 1.04
         if "metallurgists" in m:
-            mpo *= 1.05
+            mpo *= 1.04
         if "craftsmen" in m:
-            mpo *= 1.05
+            mpo *= 1.04
+        if "collectivists" in m:
+            mpo *= 1.03
         mpo = mpo*math.sqrt(self.culture.tech["production"])
         self.foodProduction = min(self.population*mpo,rscMax[0])
         self.industrialProduction = min(self.population*mpo,rscMax[1])
@@ -844,6 +850,7 @@ class City:
         self.cityType = self.cType(self.population)
         self.diaspora()
         for r in self.roads:
+            self.industrialProduction -= 1
             r.build()
     def diaspora(self):
         self.threshold = 1500*(0.99**self.age)
@@ -872,7 +879,7 @@ class City:
         if "warriors" in m:
             self.threshold *= 1.2
         if (((self.population > self.threshold and roll > minRoll) or roll > superRoll)
-        and self.age > 12 and (random.random() < 1/(len(self.culture.cities)))):
+        and self.age > 12 and (random.random() < 1/(len(self.culture.cultureCities())))):
             self.migrate()
     def migrate(self):
         emigrants = math.ceil(self.population*random.uniform(0.1,0.5))
@@ -1062,6 +1069,7 @@ class Road:
         self.nodes = []
         self.nodes.append(self.start)
         self.size = 2
+        self.color = (20,120,104)
     def build(self):
         if self.built == 1:
             return -1
@@ -1087,9 +1095,8 @@ class Road:
         if n0 not in n1.roads:
             n1.roads.append(n0)
     def drawSelf(self,drawer):
-        dCol = Tools.streetColor
         nds = [x.coords() for x in self.nodes]
-        drawer.line(nds,fill=dCol,width=self.size)
+        drawer.line(nds,fill=self.color,width=self.size)
 
 class ResourceRegion:
     def __init__(self,c,m):
@@ -1128,8 +1135,9 @@ class ResourceRegion:
                 rawMetal += p.metallicity
                 rawAnimal += p.herbivores + (p.carnivores/3)
             else:
-                rawAnimal += 0.1
+                rawAnimal += 0.17
                 rawPlant += 0.1
+                rawMetal += 0.02
         m = self.culture.value.mainValues
         if "metallurgists" in m:
             rawMetal = rawMetal*1.25
@@ -1211,25 +1219,43 @@ class Culture:
         self.tech = {}
         self.items = []
         for k in list(self.myMap.technologies.keys()):
-            self.tech[k] = 1+(0.2*random.random())
+            self.tech[k] = 1+(0.1*random.random())
         for p in range(50):
             self.updateTech()
         self.unitcount = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
     def happiness(self):
         p = 0
         h = 0
-        for f in self.myMap.cities:
-            if f.culture == self:
-                p += f.population
-                h += f.population*f.happiness()
+        for f in self.cultureCities():
+            p += f.population
+            h += f.population*f.happiness()
         h = h/p
         return h
     def populationCount(self):
         p = 0
+        for f in self.cultureCities():
+            p += f.population
+        return p
+    def closestCities(self,otherCulture):
+        ours = self.cultureCities()
+        theirs = otherCulture.cultureCities()
+        ourCity = random.choice(ours)
+        theirCity = random.choice(theirs)
+        dist = ourCity.distanceToCity(theirCity)
+        for c in ours:
+            for g in theirs:
+                d = c.distanceToCity(g)
+                if d < dist:
+                    dist = d
+                    ourCity = c
+                    theirCity = g
+        return [ourCity,theirCity]
+    def cultureCities(self):
+        cc = []
         for f in self.myMap.cities:
             if f.culture == self:
-                p += f.population
-        return p
+                cc.append(f)
+        return cc
     def updateTech(self):
         for t in self.tech.keys():
             multiplier = 0.005 + random.choice([-0.001,0.000,0.001])
@@ -1310,7 +1336,7 @@ class Culture:
         pmod = clamp((pp**nn)/(0.90),0,10)*0.01
         redc = clamp(figs/75,0,1)*0.1
         while random.random() > ((0.985-pmod)+redc):
-            ctnodes = [c.node for c in self.cities]
+            ctnodes = [c.node for c in self.cultureCities()]
             fig = Population(self,p=1,kind="person",node=random.choice(ctnodes))
     def updateCulture(self):
         self.updateTech()
@@ -1759,7 +1785,7 @@ class Culture:
         s += "Capital: " + self.origin.city.name + "\n\n"
         for k in self.tech.keys():
             lv = self.tech[k]
-            lvl = ((2**((1.2*lv)-2))/((2**((1.2*lv)-2))+3))*(5.8*(1.002**lv))-0.4
+            lvl = techTier(lv)
             testlvl = abs(round(lvl))
             lvldiff = abs(testlvl-lvl)
             if lvl > testlvl:
@@ -1795,7 +1821,7 @@ class Population:
         self.number = p
         self.profession = prf
         self.kind = kind
-        self.importance = random.randint(2,16)
+        self.importance = math.floor((random.random()**2)*23)
         if i != None:
             self.importance = i
         self.baseImportance = self.importance
@@ -1859,7 +1885,7 @@ class Population:
             or self.kind == "location" or self.kind == "army"):
             self.immortal = 1
         self.dead = 0
-        if self.kind not in ["army","deity","beast","location"]:
+        if self.kind not in ["army","deity","beast","location","group"]:
             e = Event(m=self.culture.myMap,a=self.age,kind="birth",sub=self,actrs=self.parents,loc=self.location)
             e.importance = self.importance*random.uniform(0.6,2)
         self.works = []
@@ -1962,8 +1988,8 @@ class Population:
             self.power[0] *= 2
         if (self.species == "brontosaur" or self.species == "whale" or
             self.species == "albatross" or self.species == "elephant"):
-            self.power[0] *= 1.5
-            self.power[1] *= 1.5
+            self.power[0] *= 1.4
+            self.power[1] *= 1.6
         self.power[0] = math.floor(self.power[0])
         self.power[1] = math.floor(self.power[1])
         self.measure = "long"
@@ -1975,8 +2001,9 @@ class Population:
                   "gargantuan beast","monumental beast","titan","legendary beast"]
         self.title = random.choice(titles) + " "
         e = Event(self.culture.myMap,a=self.age,kind="birth",sub=self,loc=self.location)
-        e.importance = math.floor((self.power[0]/8)+(self.age/8))
-        self.importance += 24
+        e.importance = math.floor(((self.power[0]/8)+(self.age/8))*random.uniform(0.75,1.15))
+        self.importance += 10
+        self.baseImportance = self.importance
     def meander(self):
         if random.random() > 0.5:
             return -1
@@ -1996,12 +2023,6 @@ class Population:
             self.location.entities.remove(self)
         self.location = n
         self.location.entities.append(self)
-    def addPop(self,p):
-        self.age = self.age*self.number
-        self.age += p.age*p.number
-        self.number = self.number+p.number
-        self.age = math.floor(self.age/self.number)
-        p.number = 0
     def agePop(self,scl):
         self.stamina = 1
         self.age += scl
@@ -2064,8 +2085,8 @@ class Population:
             if random.random() > 0.1:
                 kind = random.choice(["weapon","helmet","bodice"])
         t = ""
-        if random.random() > 0.2:
-            t = random.choice(["event","event","event","event","event","pop","pop","item","item"])
+        if random.random() > 0.35:
+            t = random.choice(["event","event","event","event","pop","pop","item","item"])
         if t == "event":
             e = random.choice(self.culture.myMap.events)
             while ((e.subject.culture != self.culture and random.random() < 0.98-(e.importance/300))
@@ -2289,6 +2310,7 @@ class Flag:
         self.yDim = 192
         self.colors = []
         self.newColor()
+        self.filename = None
     def newColor(self):
         h = random.randint(0,255)
         s = random.randint(0,255)
@@ -2319,6 +2341,10 @@ class Flag:
               (random.choice([0,self.xDim,self.xDim/2]),random.randint(0,self.yDim))])
         rad = random.randint(1,self.yDim)
         drawCircle(drawer,p0[0],p0[1],rad,col)
+    def getFilename(self):
+        if self.filename == None:
+            self.genFlag()
+        return self.filename
     def genFlag(self):
         img = Image.new('HSV',(self.xDim,self.yDim),self.colors[0])
         drawer = ImageDraw.Draw(img)
@@ -2542,7 +2568,7 @@ class Map:
         self.fertScale = 100
         self.metalScale = 140000
         self.vegScale = 18295
-        self.wildlifeScale = 500
+        self.wildlifeScale = 1000
         self.rscScale = 5
     def nodeInfo(self,n):
         self.divWidth = 64
@@ -2707,7 +2733,7 @@ class Map:
         if shape == "island" or shape == "volcanic":
             self.addSineHill(self.xDim/2,self.yDim/2,0.4,radius=random.uniform(0.6,1.1)*self.xDim/1.5)
             if shape == "volcanic":
-                self.smooth(1)
+                self.smooth(2)
                 self.elevationAdd(-0.1)
                 self.addSineHill(self.xDim/2,self.yDim/2,0.25,radius=random.uniform(0.6,1.1)*self.xDim*1.5)
                 self.smooth(1)
@@ -2783,8 +2809,8 @@ class Map:
         for p in self.atlas:
             s = self.seasonStrength
             seasonMod = clamp(1+(math.sin((math.pi*self.date)/2)*s),1-s,1+s)
-            latTemp = 0.7*(p.dist(self.north)/self.xDim)
-            elevationTemp = 0.2*(1-p.elevation)
+            latTemp = 0.6*(p.dist(self.north)/self.xDim)
+            elevationTemp = 0.3*(1-p.elevation)
             p.temp = clamp(seasonMod*(elevationTemp+latTemp),0,1)
     def soilProperties(self):
         for p in self.atlas:
@@ -2827,8 +2853,8 @@ class Map:
         bColors["boreal forest"] = (100,64,92)
         bColors["forest"] = (90,108,108)
         bColors["tropical forest"] = (78,162,96)
-        bColors["frost"] = (134,32,206)
-        bColors["mountain"] = (134,0,96)
+        bColors["frost"] = (134,32,188)
+        bColors["mountain"] = (64,0,96)
         bColors["water"] = Tools.waterColor
         self.biomeColors = bColors
         self.waterHue = 142
@@ -3191,7 +3217,7 @@ class Map:
                        "ice":0.1,
                        "growth":0.2,
                        "plantlife":0.2}
-    def technologies(self):
+    def technologySetup(self):
         self.technologies = {}
         self.technologies["weaponry"] = 1
         self.technologies["defense"] = 1
@@ -3206,13 +3232,28 @@ class Map:
         self.technologies["research"] = 1
         self.techtiers = ["primitive","bronze age",
                            "classical period","medieval","pre-industrial",
-                           "industrial","contemporary"]
+                           "industrial","contemporary","contemporary","contemporary"]
         # e.g. "medieval humanity", "classical period humanity"
     def godSpheres(self):
         s0 = list(self.influences.keys())
         s1 = list(self.values.keys())
         s2 = list(self.valuesOutputs.keys())
-        self.spheres = s0+s1+s2
+        s3 = list(self.technologies.keys())
+        self.spheres = s0+s1+s2+s3
+    def biomeWildlife(self):
+        self.wildlife = {}
+        self.wildlife["desert"] = [["hare","camel"],["scorpion","snake","vulture","lizard"]]
+        self.wildlife["savanna"] = [["antelope","elephant","rhinoceros","giraffe"],["lion","hyena"]]
+        self.wildlife["tundra"] = [["hare","reindeer","yak"],["wolf","bear"]]
+        self.wildlife["shrubland"] = [["hare","deer","tortoise","goat"],["fox","lynx"]]
+        self.wildlife["boreal forest"] = [["hare","reindeer","moose","yak"],["wolf","bear","owl","fox"]]
+        self.wildlife["forest"] = [["deer","tortoise","tapir","squirrel"],["tiger","bear","lynx"]]
+        self.wildlife["tropical forest"] = [["monkey","gorilla","tapir","sloth","frog","hippopotamus"]
+        ,["tiger","snake","panther","lizard"]]
+        self.wildlife["frost"] = [["penguin","hare"],["bear","wolf"]]
+        self.wildlife["mountain"] = [["goat","alpaca","yak"],["wolf","cougar","hawk","snake"]]
+        self.wildlife["water"] = [["carp","salmon","tuna","manatee","whale","turtle","lobster"]
+        ,["shark","seal","squid","octopus","swordfish","dolphin"]]
     def nearestCityDist(self,xx,yy):
         if len(self.cities) < 1:
             return self.xDim
@@ -3343,7 +3384,7 @@ class Map:
         self.date += self.timeScale
         self.age += self.timeScale
     def updateResources(self):
-        self.setBiomes()
+        self.vegetation()
         for r in self.resourceRegions:
             r.updateReg()
     def updateTerritory(self):
@@ -3499,8 +3540,7 @@ class Map:
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
-        self.displayCulture.flag.genFlag()
-        photo = Image.open(self.displayCulture.flag.filename)
+        photo = Image.open(self.displayCulture.flag.getFilename())
         self.flagImg = ImageTk.PhotoImage(photo)
         self.flagLbl = Label(self.infoGui,image=self.flagImg)
         self.flagLbl.config(borderwidth=32)
@@ -3541,6 +3581,8 @@ class Map:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
         for i in self.displayCulture.populations.values():
+            if i.kind in ["deity","location"]:
+                continue
             s = " The "+i.nameFull()+" "
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = i: self.popInfo(d))
@@ -3766,8 +3808,8 @@ world.buildRegions()
 world.setWildlife()
 world.influences()
 world.values()
+world.technologySetup()
 world.godSpheres()
-world.technologies()
 world.scatterCities(random.randint(8,16))
 world.scatterBeasts(random.randint(8,24))
 print("Drawing map...")

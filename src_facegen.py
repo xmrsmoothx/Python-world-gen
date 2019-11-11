@@ -42,15 +42,15 @@ class Face:
         # Dark climates produce light skin, hair, and eyes.
         # Dry climates produce thin noses.
         # Humid climates produce wide noses and thick lips.
-        self.headheight = clamp(0.9*self.xDim*random.uniform(0.7,1.1)*(math.sqrt(clamp(hotness,0.4,0.8))),self.xDim*0.6,self.xDim)
-        self.headwidth = clamp(0.9*self.xDim*random.uniform(0.7,1.1)*(1-(hotness**2)),self.xDim/2.5,self.xDim*0.9)
+        self.headheight = clamp(0.9*self.xDim*random.uniform(0.7,1.1)*(math.sqrt(clamp(hotness,0.4,0.8))),self.xDim*0.6,self.xDim*0.8)
+        self.headwidth = clamp(0.9*self.xDim*random.uniform(0.7,1.1)*(1-(hotness**2)),self.xDim*0.45,self.xDim*0.7)
         self.neckwidth = self.headwidth*0.6*random.uniform(0.8,1.2)
         self.eyesize = clamp(0.2*self.xDim*random.uniform(0.8,1.2)*(1-(0.5*latitude)),self.xDim/16,self.xDim/10)
         self.nosewidth = 0.15*self.xDim*random.uniform(0.7,1)*(math.sqrt(clamp(humidity,0.1,0.5)))
         self.lipthickness = clamp(0.2*self.xDim*random.uniform(0.8,1.2)*clamp(humidity,0.1,0.5)*clamp(hotness,0.1,0.7),self.xDim/24,self.xDim/7)
         self.lipwidth = self.lipthickness*3*random.uniform(0.7,1.3)
-        self.melanin = clamp(254-(210*random.uniform(0.9,1.1)*(1.1-latitude)),42,230)
-        self.skincolor = (math.floor(random.uniform(0.9,1.1)*14),clamp(math.floor(random.uniform(0.8,1.3)*(20+self.melanin)),24,200),clamp(math.floor(random.uniform(1,1.1)*(255-self.melanin)),32,250))
+        self.melanin = clamp(254-(230*random.uniform(0.9,1.1)*(1.1-latitude)),10,230)
+        self.skincolor = (math.floor(random.uniform(0.9,1.1)*14),clamp(math.floor(random.uniform(0.8,1.3)*(20+self.melanin)),24,200),clamp(math.floor(random.uniform(1,1.1)*(255-self.melanin)),43,247))
         self.shadowcolor = (self.skincolor[0],self.skincolor[1],math.floor(self.skincolor[2]*0.65))
         self.haircolor = (math.floor(random.uniform(0.8,1.4)*24),math.floor(random.uniform(0.9,1.1)*50),math.floor(random.uniform(0.9,1.1)*self.melanin))
         self.eyecolor = (math.floor(random.uniform(0.1,1)*240),math.floor(random.uniform(0.8,1.4)*180),250-(math.floor(random.uniform(0.6,1)*self.melanin)))

@@ -36,7 +36,7 @@ class noiseMaker:
         return tileVal/(initialSize*2)
 
 class Tools:
-    streetColor = (16,128,92)
+    streetColor = (16,120,104)
     waterColor = (142,78,64)
 
 def clamp(x,minimum,maximum):
@@ -65,6 +65,10 @@ def ordinal(x):
     else:
         return o + "th"
 
+def techTier(lv):
+    return clamp(((2**((1.2*lv)-2))/((2**((1.2*lv)-2))+3))*(5.8*(1.002**lv))-0.4,0,8)
+    
+
 def synonym(x,seed=0,exclusive=0):
     s = {}
     s["mountain"] = ["mountain","peak","ridge"]
@@ -72,15 +76,16 @@ def synonym(x,seed=0,exclusive=0):
     s["shrubland"] = ["shrubland","badlands","bushland"]
     s["forest"] = ["forest","woods","wood","woodland"]
     s["desert"] = ["desert","desert","wastes","barrens"]
-    s["tundra"] = ["tundra","steppes","tundra"]
+    s["tundra"] = ["tundra","steppes","tundras"]
     s["frost tundra"] = ["frost tundra","arctic","alpines","frozen tundra"]
-    s["tropical forest"] = ["tropical forest","jungle","bush"]
+    s["tropical forest"] = ["tropical forest","jungle","bush","rainforest"]
     s["boreal forest"] = ["boreal forest","woods","wood","taiga"]
     s["carnivores"] = ["carnivores","predators","hunters"]
     s["herbivores"] = ["herbivores","livestock","cattle","prey"]
     s["fear"] = ["fear","terror","dread","anxiety"]
     s["warriors"] = ["warriors","fighters","soldiers"]
     s["traders"] = ["traders","merchants","sellers","brokers"]
+    s["naturalists"] = ["naturalists","herbalism","gardeners","herbalists","gardening"]
     s["travelers"] = ["travelers","wanderers","nomads","migrants","itinerants"]
     s["agriculture"] = ["agriculture","farming","irrigation","crops","cultivation"]
     s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
@@ -95,7 +100,8 @@ def synonym(x,seed=0,exclusive=0):
     s["darkness"] = ["darkness","night","twilight","dusk"]
     s["death"] = ["death","mortality","murder"]
     s["ice"] = ["ice","snow","frost","cold"]
-    s["greed"] = ["greed","wealth","gold","riches"]
+    s["greed"] = ["greed","wealth","gold","riches","treasure"]
+    s["growth"] = ["growth","sprouting","farming","blooming"]
     s["sky"] = ["sky","stars","heavens","clouds"]
     s["superstition"] = ["superstition","religion","faith","theology","paranormal"]
     s["collectivists"] = ["collectivists","community","cooperation","communism","socialism"]
