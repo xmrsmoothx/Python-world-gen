@@ -1,5 +1,5 @@
 # Python-world-gen
-A crazy python worldgen toy.
+An experimental python worldgen toy.
 
 
 Allegedly, this allows the user to satisfy dependencies and run the program:
