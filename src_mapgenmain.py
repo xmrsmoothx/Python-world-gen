@@ -128,6 +128,13 @@ class Node:
     def link(self,newNeighbor):
         self.neighbors.append(newNeighbor)
         newNeighbor.neighbors.append(self)
+    def linkRoads(self,newNeighbor):
+        if newNeighbor not in self.neighbors:
+            return 0
+        if newNeighbor not in self.roads:
+            self.roads.append(newNeighbor)
+        if self not in newNeighbor.roads:
+            newNeighbor.roads.append(self)
     def getKey(self):
         return self.key
     def watery(self,sealevel=0):
@@ -216,8 +223,6 @@ class Node:
         self.elevation = sum(nbrs)/len(nbrs)
     def defaultRoads(self):
         self.roads = []
-        for k in self.neighbors:
-            self.roads.append(k)
     def setVegetation(self):
         tempFitness = 1-abs(0.5-self.temp)
         elevationFitness = 1-abs(0.45-self.elevation)
@@ -238,20 +243,20 @@ class Node:
             else:
                 self.biome = "boreal forest"
         elif self.temp < 0.34:
-            if self.rainfall < 0.2:
+            if self.rainfall < 0.1:
                 self.biome = "tundra"
-            elif self.rainfall < 0.3:
+            elif self.rainfall < 0.16:
                 self.biome = "shrubland"
             elif self.rainfall < 0.5:
                 self.biome = "boreal forest"
             else:
                 self.biome = "forest"
         elif self.temp < 0.58:
-            if self.rainfall < 0.04:
+            if self.rainfall < 0.03:
                 self.biome = "desert"
-            elif self.rainfall < 0.1:
+            elif self.rainfall < 0.06:
                 self.biome = "savanna"
-            elif self.rainfall < 0.2:
+            elif self.rainfall < 0.1:
                 self.biome = "shrubland"
             elif self.rainfall < 0.6:
                 self.biome = "forest"
@@ -260,7 +265,7 @@ class Node:
         else:
             if self.rainfall < 0.04:
                 self.biome = "desert"
-            elif self.rainfall < 0.11:
+            elif self.rainfall < 0.1:
                 self.biome = "savanna"
             else:
                 self.biome = "tropical forest"
@@ -331,6 +336,10 @@ class Node:
             for n in self.neighbors:
                 if n.landmass == self.landmass:
                     drawer.line([self.coords(),n.coords()],dCol,3)
+    def drawRoads(self,drawer,roadCol):
+        for n in self.neighbors:
+            if n in self.roads:
+                drawer.line([self.coords(),n.coords()],roadCol,2)
     def drawTownGen(self):
         self.townGen = Town(self,self.myMap,self.name)
         townImg = Image.new("HSV",(self.townGen.xDim,self.townGen.yDim),(0,0,255))
@@ -763,7 +772,7 @@ class City:
         self.rawResources = [0,0]
         self.industrialProduction = 1
         self.foodProduction = 1
-        self.age = random.randint(0,20)
+        self.age = 0
         self.roads = []
         self.kind = "city"
         e = Event(self.culture.myMap,a=self.age,kind="founding",sub=self,actrs=[self.culture.leader])
@@ -849,17 +858,14 @@ class City:
         self.population = clamp(math.floor(self.population+growth+random.choice([-1,0,0,0,0,1])),1,10000000)
         self.cityType = self.cType(self.population)
         self.diaspora()
-        for r in self.roads:
-            self.industrialProduction -= 1
-            r.build()
     def diaspora(self):
         self.threshold = 1500*(0.99**self.age)
         roll = random.random()
         minRoll = 0.7
-        superRoll = 0.97
+        superRoll = 0.98
         m = self.culture.value.mainValues
         if "simplicity" in m:
-            self.threshold *= 0.7
+            self.threshold *= 1.1
             roll = roll/2
         if "travelers" in m:
             self.threshold *= 0.8
@@ -890,7 +896,10 @@ class City:
         if ((n.culture == self.culture or n.culture == None) 
             and n.city == None and n.resourceRegion == None and n.landmass != None):
             cc = City(n,pop=emigrants,cltr=self.culture,m=self.myMap)
-            rd = Road(self.node,n,self)
+            bcount = random.randint(19,23)
+            builders = Population(c=self.culture,t="builders",a=random.randint(22,28),p=bcount,kind="group",node=self.node,prf="roadbuilder")
+            builders.setPath(n)
+            emigrants += bcount
             self.population = clamp(self.population-emigrants,1,10000000)
             self.age = 0
     def cType(self,p):
@@ -1223,6 +1232,7 @@ class Culture:
         for p in range(50):
             self.updateTech()
         self.unitcount = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        self.cultureFace = None
     def happiness(self):
         p = 0
         h = 0
@@ -1312,8 +1322,6 @@ class Culture:
     def updatePops(self):
         for f in list(self.populations.keys()):
             if f in self.populations:
-                if self.populations[f].kind == "beast":
-                    self.populations[f].meander()
                 self.populations[f].agePop(self.myMap.timeScale)
         if self.leader == None or self.leader.number == 0:
             pp = self.leader
@@ -1490,7 +1498,7 @@ class Culture:
         titleDict.update(dict.fromkeys(["Agriculturalists",
                        "Farming commune",
                        "Agricultural commune",
-                       "Agricultural naturalists"],["Farmers","Yeomen","Peasants"]))
+                       "Agricultural naturalists"],["Farmers","Yeomen","Peasants","Cultivators"]))
         titleDict.update(dict.fromkeys(["Empire",
                         "Hegemony",
                         "Imperium"],["Empire"]))
@@ -1728,17 +1736,21 @@ class Culture:
                 if age < self.myMap.age:
                     e = Event(m=self.myMap,a=age,kind="birth",sub=ent,actrs=ent.parents)
                     e.importance = math.floor(150/k)+random.randint(5,15)
-    def generateCultureFace(self):
-        res = 192
-        self.cultureFace = Face(self,x=res)
-        self.cultureFace.generateCultureFace()
-        img = Image.new('HSV',(res,res),(255,0,255))
-        drawer = ImageDraw.Draw(img)
-        self.cultureFace.drawSelf(drawer)
+    def generateCultureFace(self,mode):
         filename = "./generated/face_" + self.name + ".gif"
-        img = img.convert('RGB')
-        img.save(filename,"GIF")
-        return filename
+        if self.cultureFace == None:
+            res = 192
+            self.cultureFace = Face(self,x=res)
+            self.cultureFace.generateCultureFace()
+            img = Image.new('HSV',(res,res),(255,0,255))
+            drawer = ImageDraw.Draw(img)
+            self.cultureFace.drawSelf(drawer)
+            img = img.convert('RGB')
+            img.save(filename,"GIF")
+        if mode == 0:
+            return filename
+        else:
+            return self.cultureFace
     def shortName(self):
         name = ""
         name += self.name + " " + self.title
@@ -1811,8 +1823,9 @@ class Culture:
         for p in self.populations.keys():
             self.populations[p].drawSelf(drawer)
 
-# This can represent either an entity, a group, OR an imaginary location (in the case of mythology)
+# This can represent either an entity, a group, OR sometimes an imaginary location (in the case of mythology)
 class Population:
+    #                 culture, name, title, age, count, kind, node, profession, importance, parents
     def __init__(self,c=None,n=None,t="",a=None,p=1,kind="person",node=None,prf=None,i=None,pars=[]):
         self.tt = "pop"
         self.parents = pars
@@ -1824,6 +1837,9 @@ class Population:
         self.importance = math.floor((random.random()**2)*23)
         if i != None:
             self.importance = i
+        if len(self.parents) > 0:
+            lst = [p.importance for p in self.parents]
+            self.importance = self.importance + (0.2*(sum(lst)/len(lst)))
         self.baseImportance = self.importance
         self.measure = "tall"
         self.measurement = random.uniform(1.45,2)
@@ -1843,7 +1859,7 @@ class Population:
                       "engineer":"production","tactician":"weaponry",
                       "doctor":"medicine","farmer":"agriculture",
                       "sociologist":"equality","blacksmith":"metallurgy",
-                      "craftsman":"production"}
+                      "craftsman":"production","roadbuilder":"transportation"}
             if self.kind != "army":
                 self.field = self.fields[self.profession]
         else:
@@ -1919,6 +1935,8 @@ class Population:
             ss += synonym(self.profession,seed=seedNum(self.culture.name),exclusive=q)
             ss = string.capwords(ss)
             self.name = (ss,"")
+        self.face = None
+        self.path = None
     def associate(self):
         k = random.choice(list(self.culture.myMap.spheres))
         self.associations.append(k)
@@ -2004,6 +2022,8 @@ class Population:
         e.importance = math.floor(((self.power[0]/8)+(self.age/8))*random.uniform(0.75,1.15))
         self.importance += 10
         self.baseImportance = self.importance
+    def setPath(self,n):
+        self.path = Path(self.location,n)
     def meander(self):
         if random.random() > 0.5:
             return -1
@@ -2018,8 +2038,18 @@ class Population:
                 nm = random.choice(self.location.neighbors)
                 j = j+1
         self.travel(nm)
+    def step(self):
+        if random.uniform(0,1) < 0.01:
+            return 0
+        nextNode = self.path.nextNode(self.location)
+        if self.profession == "roadbuilder":
+            self.location.linkRoads(nextNode)
+        self.travel(nextNode)
+        if nextNode == self.path.target:
+            self.path = None
+            self.die()
     def travel(self,n):
-        if self.location != None:
+        if self.location != None and self in self.location.entities:
             self.location.entities.remove(self)
         self.location = n
         self.location.entities.append(self)
@@ -2053,9 +2083,20 @@ class Population:
                 self.power[1] *= 1.1
             self.power[0] = math.floor(self.power[0])
             self.power[1] = math.floor(self.power[1])
+        if self.kind == "beast":
+            self.meander()
+        if self.path != None:
+            if self.path.hasWater() == 1 and self.profession == "roadbuilder":
+                self.erase()
+                return -1
+            self.step()
     def kill(self,n):
         n = math.floor(n)
         self.number = clamp(self.number-n,0,self.number)
+    def erase(self):
+        self.importance = 0
+        self.die()
+        del self.culture.populations[self.name]
     def die(self):
         if self.importance > 3:
             e = Event(m=self.culture.myMap,a=0,kind="death",sub=self,loc=self.location)
@@ -2068,10 +2109,42 @@ class Population:
         if self.field == None or self.field == "":
             return False
         return True
+    def generateFace(self,mode):
+        filename = "./generated/face_" + self.justName() + ".gif"
+        if self.face == None:
+            if len(self.parents) == 0:
+                pp = self.culture.generateCultureFace(1)
+                res = 192
+                self.face = Face(self.culture,p=self,x=res)
+                self.face.generateFace1(pp)
+            elif len(self.parents) == 1:
+                pp = self.parents[0].generateFace(1)
+                res = 192
+                self.face = Face(self.culture,p=self,x=res)
+                self.face.generateFace1(pp)
+            else:
+                pp1 = self.parents[0].generateFace(1)
+                pp2 = self.parents[1].generateFace(1)
+                res = 192
+                self.face = Face(self.culture,p=self,x=res)
+                self.face.generateFace2(pp1,pp2)
+            img = Image.new('HSV',(res,res),(255,0,255))
+            drawer = ImageDraw.Draw(img)
+            self.face.drawSelf(drawer)
+            img = img.convert('RGB')
+            img.save(filename,"GIF")
+        if mode == 0:
+            return filename
+        else:
+            return self.face
     def createWork(self):
         if not (self.hasField()):
             return -1
-        if self.culture.leader == self and random.random() > 0.4:
+        if self.profession == "roadbuilder":
+            return -1
+        if self.culture.leader == self and random.random() > 0.25:
+            return -1
+        if self.number > 1 and random.random() > 0.35:
             return -1
         kind = "book"
         subj = None
@@ -2089,11 +2162,11 @@ class Population:
             t = random.choice(["event","event","event","event","pop","pop","item","item"])
         if t == "event":
             e = random.choice(self.culture.myMap.events)
-            while ((e.subject.culture != self.culture and random.random() < 0.98-(e.importance/300))
+            while ((e.subject.culture != self.culture and random.random() < 0.98-(e.importance/400))
                 or (e.subject.culture == self.culture and random.random() < 0.75-(e.importance/100))):
                 e = random.choice(self.culture.myMap.events)
             subj = e
-            e.importance = e.importance*(1+(random.uniform(0.1,0.8)**2))
+            e.importance = e.importance*(0.85+(random.uniform(0.1,0.8)**2))
         if t == "pop":
             p = self.culture.populations[random.choice(list(self.culture.populations.keys()))]
             cc = random.choice([self.culture,self.culture,self.culture,self.culture,self.culture,self.culture,
@@ -2268,9 +2341,43 @@ class Population:
             s += "legendary"
         s += ".\n"
         if self.dead == 1:
-            s += self.pronouns[self.gender].capitalize()+ " " + self.toBe[self.gender] + " dead."
+            s += self.pronouns[self.gender].capitalize()+ " " + self.toBe[self.gender]
+            if self.kind == "group":
+                s += " disbanded."
+            else:
+                s += " dead."
         self.description = s
         return s
+    def drawHammer(self,drawer,x,y):
+        drawer.line([(x-3,y+4),(x+5,y-4)],fill=(0,0,0),width=2)
+        p0 = (x+1,y-5)
+        p1 = (x+6,y)
+        p2 = (x+4,y+2)
+        p3 = (x-1,y-3)
+        drawer.polygon([p0,p1,p2,p3],fill=self.culture.bannerColor,outline=(0,0,0))
+    def drawChevron(self,drawer,x,y,count):
+        r = 1
+        y = y-math.ceil(count/2)
+        for n in range(count):
+            if r == 1:
+                c = (0,0,0)
+            else:
+                c = self.culture.bannerColor
+            pts = [(x,y-2),(x-3,y+1),(x+3,y+1)]
+            drawer.polygon(pts,fill=c)
+            y = y+2
+            r = 1-r
+    def drawSkull(self,drawer,x,y):
+        pts = [(x,y),(x-1,y),(x+1,y),(x-2,y),(x+2,y),(x,y+1),
+               (x-1,y+1),(x+1,y+1),(x,y-1),(x-2,y-1),(x+2,y-1),
+               (x,y-2),(x-1,y-2),(x+1,y-2),(x-2,y-2),(x+2,y-2),(x,y-2)]
+        drawer.point(pts,fill=(0,0,255))
+        pts = [(x-1,y-1),(x+1,y-1),(x,y+3),(x+2,y+3),(x-2,y+3),
+               (x-2,y-3),(x-1,y-3),(x,y-3),(x+1,y-3),(x+2,y-3),
+               (x-3,y-2),(x-3,y-1),(x-3,y),(x-3,y+1),(x-2,y+1),
+               (x+3,y-2),(x+3,y-1),(x+3,y),(x+3,y+1),(x+2,y+1),
+               (x-2,y+2),(x-1,y+2),(x,y+2),(x+1,y+2),(x+2,y+2)]
+        drawer.point(pts,fill=(0,0,0))
     def drawSelf(self,drawer):
         if self.location == None:
             return -1
@@ -2278,29 +2385,52 @@ class Population:
             return -1
         x = round(self.location.x)
         y = round(self.location.y)
-        if self.kind == "army":
-            r = 0
-            y = y-2
-            for n in range(4):
-                if r == 1:
-                    c = (0,0,0)
-                else:
-                    c = self.culture.bannerColor
-                pts = [(x,y-2),(x-3,y+1),(x+3,y+1)]
-                drawer.polygon(pts,fill=c)
-                y = y+2
-                r = 1-r
+        if self.profession == "roadbuilder":
+            self.drawHammer(drawer,x,y)
+        elif self.kind == "army":
+            self.drawChevron(drawer,x,y,3)
         elif self.kind == "beast":
-            pts = [(x,y),(x-1,y),(x+1,y),(x-2,y),(x+2,y),(x,y+1),
-                   (x-1,y+1),(x+1,y+1),(x,y-1),(x-2,y-1),(x+2,y-1),
-                   (x,y-2),(x-1,y-2),(x+1,y-2),(x-2,y-2),(x+2,y-2),(x,y-2)]
-            drawer.point(pts,fill=(0,0,255))
-            pts = [(x-1,y-1),(x+1,y-1),(x,y+3),(x+2,y+3),(x-2,y+3),
-                   (x-2,y-3),(x-1,y-3),(x,y-3),(x+1,y-3),(x+2,y-3),
-                   (x-3,y-2),(x-3,y-1),(x-3,y),(x-3,y+1),(x-2,y+1),
-                   (x+3,y-2),(x+3,y-1),(x+3,y),(x+3,y+1),(x+2,y+1),
-                   (x-2,y+2),(x-1,y+2),(x,y+2),(x+1,y+2),(x+2,y+2)]
-            drawer.point(pts,fill=(0,0,0))
+            self.drawSkull(drawer,x,y)
+        
+
+class Path:
+    def __init__(self,n1,n2,land=True):
+        self.current = n1
+        self.target = n2
+        self.nodes = [n1]
+        self.path(land)
+        self.watery = 0
+    def path(self,land):
+        a = self.nodes[-1]
+        while a != self.target and a != None:
+            dist = 10000000
+            nn = None
+            for p in a.neighbors:
+                if p.dist(self.target) < dist and ((p.watery() == 0 and land == True) or land == False):
+                    nn = p
+                    dist = p.dist(self.target)
+            if nn in self.nodes:
+                self.watery = 1
+                for p in a.neighbors:
+                    if p.dist(self.target) < dist:
+                        nn = p
+                        dist = p.dist(self.target)
+            self.nodes.append(nn)
+            a = self.nodes[-1]
+    def nextNode(self, currentNode):
+        if currentNode == None:
+            return self.nodes[0]
+        nodeIndex = self.nodes.index(currentNode)
+        if nodeIndex == len(self.nodes):
+            return -1
+        return self.nodes[nodeIndex+1]
+    def hasWater(self):
+        if self.watery == 1:
+            return 1
+        for n in self.nodes:
+            if n.watery() == 1:
+                return 1
+        return 0
         
 
 class Flag:
@@ -2313,7 +2443,7 @@ class Flag:
         self.filename = None
     def newColor(self):
         h = random.randint(0,255)
-        s = random.randint(0,255)
+        s = random.randint(32,255)
         v = random.randint(32,255)
         col = (h,s,v)
         self.colors.append(col)
@@ -2443,7 +2573,6 @@ class Map:
         self.cities = []
         self.cultures = []
         self.events = []
-        self.roads = []
         self.resourceRegions = []
         self.resourceScale = 1
         self.sealevel = 0.4
@@ -2459,6 +2588,7 @@ class Map:
         self.autoCycle = 0
         self.age = random.randint(1000,100000)
         self.year = random.randint(113,974)
+        self.roadCol = (20,120,104)
     def relaxAvg(self,strength):
         for i in range(strength):
             for p in self.atlas:
@@ -2790,16 +2920,16 @@ class Map:
                 p.waterdistance = self.wdmax
     def rainfall(self):
         for p in self.atlas:
-            rainfall = 0.4*random.uniform(0.95,1.05)
-            rainfall = ((rainfall*(0.5-((p.temp*0.7)+(p.elevation*0.3)+(0.7*(p.waterdistance+1)/(self.wdmax+1)))))+rainfall)/2
+            rainfall = 0.37*random.uniform(0.9,1.1)
+            rainfall = ((rainfall*(0.55-((p.temp*0.72)+(p.elevation*0.3)+(0.8*(p.waterdistance)/(self.wdmax)))))+rainfall)/2
             for n in p.neighbors:
                 if n.river != None:
-                    rainfall = rainfall*1.4
+                    rainfall = rainfall*1.2
             if p.river != None:
-                rainfall = rainfall*1.5
+                rainfall = rainfall*1.2
             for l in p.neighbors:
                 if l.watery() == 1:
-                    rainfall *= 1.25
+                    rainfall *= 1.2
             p.rainfall = clamp(rainfall,0,1)
         for p in self.atlas:
             lst = [n.rainfall for n in p.neighbors]
@@ -3230,6 +3360,7 @@ class Map:
         self.technologies["art"] = 1
         self.technologies["philosophy"] = 1
         self.technologies["research"] = 1
+        self.technologies["transportation"] = 1
         self.techtiers = ["primitive","bronze age",
                            "classical period","medieval","pre-industrial",
                            "industrial","contemporary","contemporary","contemporary"]
@@ -3350,15 +3481,18 @@ class Map:
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
         if self.viewmode == 0:
+            rds = []
             for tri in self.triangles:
                 tri.drawReal(graphDraw,self.sealevel)
             for n in self.atlas:
                 n.drawReal(graphDraw,self.sealevel)
+                if len(n.roads) > 0:
+                    rds.append(n)
             for l in self.landmasses:
                 for r in l.rivers:
                     r.drawRiver(graphDraw,self.xDim)
-            for r in self.roads:
-                r.drawSelf(graphDraw)
+            for n in rds:
+                n.drawRoads(graphDraw,self.roadCol)
             for c in self.cities:
                 c.drawSelf(graphDraw)
         elif self.viewmode == 1:
@@ -3497,6 +3631,14 @@ class Map:
         pdsc = Label(self.infoGui,textvariable=self.popString)
         pdsc.pack(anchor=W,side=RIGHT)
         self.displayCulture = p.culture
+        if p.kind == "person":
+            nn = p.generateFace(0)
+            photo = Image.open(nn)
+            self.faceImg = ImageTk.PhotoImage(photo)
+            self.faceLbl = Label(self.infoGui,image=self.faceImg)
+            self.faceLbl.config(borderwidth=32)
+            self.faceLbl.photo = photo
+            self.faceLbl.pack()
         if p.kind == "city":
             return;
         if p.kind != "beast":
@@ -3547,7 +3689,7 @@ class Map:
         self.flagLbl.photo = photo
         self.flagLbl.pack()
         
-        nn = self.displayCulture.generateCultureFace()
+        nn = self.displayCulture.generateCultureFace(0)
         photo = Image.open(nn)
         self.faceImg = ImageTk.PhotoImage(photo)
         self.faceLbl = Label(self.infoGui,image=self.faceImg)

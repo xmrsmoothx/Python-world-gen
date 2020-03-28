@@ -142,6 +142,7 @@ def synonym(x,seed=0,exclusive=0):
     s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carbiners"]
     s["siege"] = ["siege","siege towers","battering rams","demolitionists","blockades","sappers"]
     s["about"] = ["about","dealing with","related to","explaining","questioning","investigating","on","concerning"]
+    s["water"] = ["water","moisture","rain","rainfall","irrigation","fluids"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)
