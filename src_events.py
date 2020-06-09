@@ -86,7 +86,8 @@ class Event:
                 else:
                     s += "the "
                     s += self.location.region.biome + " "
-                    s += self.location.region.culturalNames[self.subject.culture.name]+".\n"
+                    s += self.location.region.culturalNames[self.subject.culture.name]
+                s += ".\n"
         s += "This event is generally considered "
         if self.importance < 15:
             s += "minor"

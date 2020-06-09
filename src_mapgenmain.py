@@ -345,6 +345,7 @@ class Node:
         townImg = Image.new("HSV",(self.townGen.xDim,self.townGen.yDim),(0,0,255))
         graphDraw = ImageDraw.Draw(townImg)
         self.townGen.drawSelf(graphDraw)
+        self.townGen.drawRoads(townImg)
         townImg = townImg.convert("RGB")
         fileName = ("./generated/"+self.townGen.mapName)
         townImg.save(self.townGen.mapName,"GIF")

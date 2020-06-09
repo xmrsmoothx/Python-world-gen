@@ -8,8 +8,46 @@ Created on Tue Dec 26 14:52:37 2017
 import numpy as np
 import random
 import math
+from PIL import Image, ImageDraw, ImageTk
 from scipy.spatial import Voronoi
 from src_tools import *
+
+XDIM = 720
+BORDERSCALE = 1/8
+
+#  Best evaluated from 2.25 to 5.75
+def sinRatio(x):
+    return (math.sin(100/math.log10(x))+math.sin(1000/math.log10(6*x))-math.sin(1000/math.log10(x/10)))
+
+#  Returns whether it crosses the x axis at or around here
+def sinRound(x):
+    if abs(sinRatio(x)) < 0.1:
+        return True
+    return False
+
+def xRange(name):
+    start = 2.25+(seedNum(name)*73 % 250)/100
+    end = start+1
+    return (start,end)
+
+def yRange(name):
+    start = 2.25+(seedNum(name)*113 % 250)/100
+    end = start+1
+    return (start,end)
+
+def xStreets(x,name):
+    xStart = xRange(name)[0]
+    xReal = xStart+((x*1)/XDIM)
+    if sinRound(xReal):
+        return True
+    return False
+
+def yStreets(y,name):
+    yStart = yRange(name)[0]
+    yReal = yStart+((y*1)/XDIM)
+    if sinRound(yReal):
+        return True
+    return False
 
 def clamp(x,minimum,maximum):
     if x < minimum:
@@ -182,8 +220,8 @@ class Town:
         self.node = n
         self.name = nom
         self.mapName = "./generated/town_"+self.name+".gif"
-        self.xDim = 720
-        self.yDim = 720
+        self.xDim = XDIM
+        self.yDim = XDIM
         self.landColor = self.myMap.biomeColors[self.node.biome]
         self.streetColor = Tools.streetColor
         self.waterColor = Tools.waterColor
@@ -312,15 +350,23 @@ class Town:
                     c1 = math.floor(c1/pp)
                     c2 = math.floor(c2/pp)
                     i.col = (c0,c1,c2)
-    def drawRoads(self,drawer):
+    def drawRoads(self,image):
+        drawer = ImageDraw.Draw(image)
         dCol = Tools.streetColor
-        drawCircle(drawer,self.xDim/2,self.yDim/2,3,dCol)
+        if self.node.city == None:
+            return 0
+        for xx in range(math.floor(XDIM-(XDIM*BORDERSCALE*2))):
+            for yy in range(math.floor(XDIM-(XDIM*BORDERSCALE*2))):
+                x = xx+(XDIM*BORDERSCALE)
+                y = yy+(XDIM*BORDERSCALE)
+                if (image.getpixel((x,y))) not in [(0,0,0),self.waterColor]:
+                    if xStreets(x,self.name) or yStreets(y,self.name):
+                        drawer.point((x,y),dCol)
     def drawSelf(self,drawer):
         drawer.rectangle([(0,0),(self.xDim,self.yDim)],self.landColor,self.landColor)
         for k in self.blocks:
             k.drawSelf(drawer)
-        self.drawRoads(drawer)
-        scl = 8
+        scl = 1/BORDERSCALE
         h = self.yDim/scl
         w = self.xDim/scl
         dCol = (0,0,0)
