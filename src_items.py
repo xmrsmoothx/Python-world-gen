@@ -12,7 +12,7 @@ import string
 import math
 
 class Item:
-    def __init__(self,k,c,nn="",f=None,s=None,i=1,cr=None):
+    def __init__(self,k,c,nn="",f=None,s=None,i=3,cr=None):
         self.tt = "item"
         self.kind = k
         self.culture = c
@@ -28,13 +28,13 @@ class Item:
         subname = ""
         if self.subject != None:
             if self.subject.tt == "event":
-                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*2)
+                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*3)
                 subname = self.subject.note()
             if self.subject.tt == "pop":
-                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*2)
+                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*3)
                 subname = "The " + self.subject.nameFull()
             if self.subject.tt == "item":
-                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*2)
+                self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*3)
                 t = ""
                 if self.subject.kind in ["book","story","piece"]:
                     t = "\""

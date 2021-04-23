@@ -34,17 +34,17 @@ class Face:
         self.xDim = x
         self.bgc = (255,0,255)
     def shiftVals(self):
-        self.headheight = self.headheight*random.uniform(0.85,1.15)
-        self.headwidth = self.headwidth*random.uniform(0.85,1.15)
-        self.neckwidth = self.headwidth*0.6*random.uniform(0.8,1.2)
-        self.eyesize = self.eyesize*random.uniform(0.86,1.13)
-        self.nosewidth = self.nosewidth*random.uniform(0.86,1.13)
-        self.lipthickness = self.lipthickness*random.uniform(0.85,1.15)
-        self.lipwidth = self.lipthickness*3.7*random.uniform(0.7,1.3)
+        self.headheight = self.headheight*random.uniform(0.9,1.1)
+        self.headwidth = self.headwidth*random.uniform(0.9,1.1)
+        self.neckwidth = self.headwidth*0.6*random.uniform(0.9,1.1)
+        self.eyesize = self.eyesize*random.uniform(0.9,1.1)
+        self.nosewidth = self.nosewidth*random.uniform(0.9,1.1)
+        self.lipthickness = self.lipthickness*random.uniform(0.9,1.1)
+        self.lipwidth = self.lipthickness*3.7*random.uniform(0.9,1.1)
         self.melanin = math.floor(self.melanin*random.uniform(0.9,1.1))
-        self.skincolor = (math.floor(self.skincolor[0]*random.uniform(0.8,1.2)),
-                          math.floor(self.skincolor[1]*random.uniform(0.8,1.2)),
-                          math.floor(self.skincolor[2]*random.uniform(0.8,1.2)))
+        self.skincolor = (math.floor(self.skincolor[0]*random.uniform(0.9,1.1)),
+                          math.floor(self.skincolor[1]*random.uniform(0.9,1.1)),
+                          math.floor(self.skincolor[2]*random.uniform(0.9,1.1)))
         self.shadowcolor = (self.skincolor[0],self.skincolor[1],math.floor(self.skincolor[2]*0.65))
         self.haircolor = (math.floor(self.haircolor[0]*random.uniform(0.8,1.2)),
                           math.floor(self.haircolor[1]*random.uniform(0.8,1.2)),

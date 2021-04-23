@@ -9,6 +9,9 @@ import random
 import math
 import numpy as np
 
+def nearestHundred(largeNum):
+    return round(largeNum/100)*100
+
 class noiseMaker:
     def __init__(self,w,h):
         self.noise = np.random.rand(w,h)
@@ -105,6 +108,7 @@ def synonym(x,seed=0,exclusive=0):
     s["sky"] = ["sky","stars","heavens","clouds"]
     s["superstition"] = ["superstition","religion","faith","theology","paranormal"]
     s["collectivists"] = ["collectivists","community","cooperation","communism","socialism"]
+    s["worshippers"] = ["worshippers","religion","monks","priests","prayer","mythology"]
     s["freedom"] = ["freedom","liberation","liberty","anarchism"]
     s["large"] = ["large","big","sizable","grand","great"]
     s["huge"] = ["huge","giant","tremendous","colossal","massive"]

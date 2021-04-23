@@ -9,7 +9,7 @@ import random
 import math
 
 class Event:
-    def __init__(self,m=None,a=0,kind="birth",sub=None,actrs=[],loc=None):
+    def __init__(self,m=None,a=1,kind="birth",sub=None,actrs=[],loc=None):
         self.tt = "event"
         self.myMap = m
         self.myMap.events.append(self)
@@ -72,7 +72,9 @@ class Event:
             s += " was elected to the leadership of the " + self.subject.culture.shortName()
             s += " during the election of " + str(self.year)
         if self.kind == "death":
-            s += " died."
+            s += " died"
+        if self.kind == "disbanded":
+            s += " disbanded"
         s += ".\n"
         if self.location != None:
             s += "This happened at "
