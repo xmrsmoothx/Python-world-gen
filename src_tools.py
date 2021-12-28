@@ -9,6 +9,11 @@ import random
 import math
 import numpy as np
 
+def getPrime(num):
+    primesList = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103]
+    num = num % len(primesList)
+    return primesList[num]
+
 def nearestHundred(largeNum):
     return round(largeNum/100)*100
 
@@ -40,7 +45,8 @@ class noiseMaker:
 
 class Tools:
     streetColor = (16,120,104)
-    waterColor = (142,78,64)
+    waterColor = (142,96,64)
+    buildingColor = (0,0,48)
 
 def clamp(x,minimum,maximum):
     if x < minimum:
@@ -69,7 +75,8 @@ def ordinal(x):
         return o + "th"
 
 def techTier(lv):
-    return clamp(((2**((1.2*lv)-2))/((2**((1.2*lv)-2))+3))*(5.8*(1.002**lv))-0.4,0,8)
+    steepness = 1.1
+    return clamp(((2**((steepness*lv)-2))/((2**((steepness*lv)-2))+3))*(5.8*(1.002**lv))-0.4,0,8)
     
 
 def synonym(x,seed=0,exclusive=0):
@@ -90,18 +97,20 @@ def synonym(x,seed=0,exclusive=0):
     s["traders"] = ["traders","merchants","sellers","brokers"]
     s["naturalists"] = ["naturalists","herbalism","gardeners","herbalists","gardening"]
     s["travelers"] = ["travelers","wanderers","nomads","migrants","itinerants"]
+    s["sailors"] = ["sailors","mariners","wayfarers","navigation","seafaring"]
+    s["swimming"] = ["swimming","sailing","navigating","diving","cruising"]
     s["agriculture"] = ["agriculture","farming","irrigation","crops","cultivation"]
     s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
     s["village"] = ["village","hamlet"]
     s["township"] = ["township","settlement"]
     s["plantlife"] = ["plantlife","plants","vegetation","flora"]
     s["vegetation"] = ["plantlife","plants","vegetation","flora"]
-    s["fields"] = ["fields","farms","pastures"]
-    s["metallicity"] = ["metallicity","metals","ore"]
-    s["fertility"] = ["fertility","plenty","abundance"]
+    s["fields"] = ["fields","farms","pastures","prairies","farmland"]
+    s["metallicity"] = ["metallicity","metals","ore","prospecting","smelting"]
+    s["fertility"] = ["fertility","plenty","abundance","virility","birth"]
     s["elevation"] = ["elevation","heights","mountains","cliffs"]
     s["darkness"] = ["darkness","night","twilight","dusk"]
-    s["death"] = ["death","mortality","murder"]
+    s["death"] = ["death","mortality","murder","the afterlife","killing"]
     s["ice"] = ["ice","snow","frost","cold"]
     s["greed"] = ["greed","wealth","gold","riches","treasure"]
     s["growth"] = ["growth","sprouting","farming","blooming"]
@@ -121,18 +130,18 @@ def synonym(x,seed=0,exclusive=0):
      "hammer","axe","staff","sceptre","mace","lance","rifle","pistol"]
     s["helmet"] = ["helmet","helm","crown","circlet","coif","headdress","coronet","diadem","sallet","bascinet"]
     s["bodice"] = ["bodice","breastplate","hauberk","mail coat","brigandine","lamellar","platemail","cuirass","coat"]
-    s["paper"] = ["paper","parchment","vellum","slate","papyrus","bamboo"]
+    s["paper"] = ["paper","parchment","vellum","slate","papyrus","bamboo","eelskin","rawhide","sandstone"]
     s["wood"] = ["wood","oak","maple","mahogany","pine","birch","hickory","fir"]
     s["stone"] = ["stone","granite","basalt","obsidian","limestone","sandstone","slate","marble","gneiss"]
     s["metal"] = ["metal","alloy","steel","iron","bronze","brass","copper","silver","gold","titanium","aluminium","tin","nickel"]
     s["paint"] = ["paint","oil","acrylic","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
     s["weaponry"] = ["weaponry","combat","artillery","blades","war","battle","assault"]
     s["defense"] = ["defense","combat","armor","war","battle","siege","fortification"]
-    s["agriculture"] = ["agriculture","farming","irrigation","crops","cultivation"]
     s["production"] = ["production","industry","factories","craftsmanship"]
-    s["mining"] = ["mining","minerals","mountains","metals","forging"]
+    s["mining"] = ["mining","minerals","mountains","metals","forging","excavation"]
     s["metallurgy"] = ["minerals","mountains","metals","forging","smithing","smelting"]
-    s["government"] = ["government","bureaucracy","administration","statism","authority","states","the state"]
+    s["government"] = ["government","bureaucracy","administration","authority","states","the state"]
+    s["transportation"] = ["transportation","sailing","travel","rail","roads","infrastructure","roadbuilding"]
     s["research"] = ["research","science","experiments","physics","mathematics","language"]
     s["equality"] = ["equality","sociology","progressivism","revolution","heirarchy","anarchy"]
     s["art"] = ["art","painting","sculpting","singing","music","beauty","drawing"]
@@ -141,12 +150,14 @@ def synonym(x,seed=0,exclusive=0):
     s["artillery"] = ["artillery","howitzers","catapults","trebuchets","ballistas","cannons"]
     s["assault infantry"] = ["assault infantry","warriors","troopers","soldiers","infantrymen","fighters","brigade"]
     s["mechanized"] = ["mechanized","tanks","armored","engineers"]
-    s["cavalry"] = ["cavalry","horseback riders","mounted","lancers","cuirassers","horseback brigade"]
+    s["cavalry"] = ["cavalry","horseback riders","mounted","lancers","cuirassers","horseback brigade","dragoons","hussars"]
     s["guard infantry"] = ["guard infantry","garrison","sentinels","defensive brigade","guardsmen","reserve"]
     s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carbiners"]
     s["siege"] = ["siege","siege towers","battering rams","demolitionists","blockades","sappers"]
-    s["about"] = ["about","dealing with","related to","explaining","questioning","investigating","on","concerning"]
-    s["water"] = ["water","moisture","rain","rainfall","irrigation","fluids"]
+    s["about"] = ["about","dealing with","related to","explaining","questioning",
+     "investigating","on","concerning","relating to","challenging","exploring","pondering"]
+    s["water"] = ["water","moisture","rain","rainfall","irrigation","fluids","humidity"]
+    s["magic"] = ["magic","witchcraft","wizardry","miracles","sorcery","alchemy","divination","voodoo","necromancy","thaumaturgy"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)

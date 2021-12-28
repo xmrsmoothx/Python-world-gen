@@ -93,7 +93,7 @@ class Event:
         s += "This event is generally considered "
         if self.importance < 15:
             s += "minor"
-        elif self.importance < 50:
+        elif self.importance < 47:
             s += "major"
         elif self.importance < 80:
             s += "extremely momentous"

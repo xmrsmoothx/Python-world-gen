@@ -115,11 +115,12 @@ class Item:
             s += " by the " + self.creator.nameFull()
         return s
     def description(self):
-        s = "\"" + self.name + "\" is a "
+        vowels = ["a","e","i","o","u"]
+        s = "\"" + self.name + "\" is a"
         if self.subkind != None:
-            s += self.subkind
+            s = s + "n " + self.subkind if self.subkind[0].lower() in vowels else s + " " + self.subkind
         else:
-            s += self.kind
+            s = s + "n " + self.kind if self.kind[0].lower() in vowels else s + " " + self.kind
         if self.kind == "art":
             s += " created by the " + self.creator.nameFull()
         elif self.kind in ["book","story"]:
@@ -172,11 +173,13 @@ class Item:
             except AttributeError: 
                 s += "The subject of the " + q + " is the " + self.subject.nameFull() + ".\n"
         s += "It is generally considered "
-        if self.importance < 12:
+        if self.importance < 13:
             s += "unimportant"
         elif self.importance < 25:
             s += "important"
-        elif self.importance < 50:
+        elif self.importance < 45:
+            s += "very important"
+        elif self.importance < 65:
             s += "extremely important"
         else:
             s += "legendary"
