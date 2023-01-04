@@ -112,7 +112,7 @@ class Node:
         self.roads = []
         self.entities = []
         self.myMap=m
-        self.name = str((xx+(yy*1028)))
+        self.name = str(math.floor(xx+(yy*437)))
     def coords(self):
         tupleVert = (self.x,self.y)
         return tupleVert
@@ -127,8 +127,9 @@ class Node:
         else:
             return 0
     def link(self,newNeighbor):
-        self.neighbors.append(newNeighbor)
-        newNeighbor.neighbors.append(self)
+        if self.dist(newNeighbor) < 100 or len(self.neighbors) == 0:
+            self.neighbors.append(newNeighbor)
+            newNeighbor.neighbors.append(self)
     def linkRoads(self,newNeighbor):
         if newNeighbor not in self.neighbors:
             return 0
@@ -205,6 +206,22 @@ class Node:
         self.slopeDirection()
         self.rSlope = self.slope*self.slopeDir
         return self.rSlope
+    def riverNext(self):
+        if self.river == None:
+            return None
+        selfIndex = self.river.nodes.index(self)
+        if selfIndex == len(self.river.nodes)-1:
+            return None
+        else:
+            return self.river.nodes[selfIndex+1]
+    def riverPrevious(self):
+        if self.river == None:
+            return None
+        selfIndex = self.river.nodes.index(self)
+        if selfIndex == 0:
+            return None
+        else:
+            return self.river.nodes[selfIndex-1]
     def waterdist(self,sealevel):
         self.getSlope()
         if self.watery() == 1 or self.river != None:
@@ -273,6 +290,8 @@ class Node:
         if self.watery() == 1:
             self.biome = "water"
     def claim(self,n,sealevel=0.4):
+        if n.resourceRegion != None and n.resourceRegion.culture != self.culture:
+            return -1
         n.culture = self.culture
         inc = 1
         if n.watery() == 1:
@@ -297,6 +316,18 @@ class Node:
                 roll = random.random()
                 if roll <= chance:
                     self.claim(n,sealevel)
+    def structure(self):
+        structureSeed = int(self.name)
+        possibleStructures = ["farm","inn","brothel","factory","mine","fort","farm","farm","farm","farm","farm","inn","mine"]
+        if self.city != None:
+            return None
+        if self.resourceRegion == None:
+            return None
+        if self.watery() == 1:
+            return None
+        if structureSeed % 2 == 0:
+            return None
+        return possibleStructures[structureSeed % len(possibleStructures)]
     def toString(self):
         self.selfString = "("
         self.selfString += str(self.x)
@@ -921,6 +952,11 @@ class City:
         else:
             c = "metropolis"
         return c.capitalize()
+    def governanceName(self):
+        if self.culture.origin == self.node:
+            return self.culture.nameOfCapital()
+        else:
+            return self.culture.nameOfTownHall(self.name)
     def justName(self):
         return self.name
     def nameFull(self):
@@ -1074,6 +1110,7 @@ class City:
     def cityNotes(self):
         s = self.name + " ("
         s += self.cType(self.population) + ")\n\n"
+        s += "Governance: " + self.governanceName() + "\n\n"
         s += "Civilian population: " + str(self.population) + "\n\n"
         s += "Number of notable entities at this location: " + str(len(self.node.entities)) + "\n\n"
         return s
@@ -1225,6 +1262,7 @@ class Culture:
         self.name = self.language.name
         self.populations = {}
         self.magic = []
+        self.favoriteDeity = None
         self.generateMythology()
         self.title = self.setTitle()
         self.flag = Flag(self)
@@ -1775,6 +1813,7 @@ class Culture:
                     e = Event(m=self.myMap,a=age,kind="birth",sub=ent,actrs=ent.parents)
                     e.importance = ent.importance*random.uniform(0.66666,1.33333)
                     ent.birthEvent = e
+        self.favoriteDeity = random.choice(self.deities)
     def generateCultureFace(self,mode):
         filename = "./generated/face_" + self.name + ".gif"
         if self.cultureFace == None:
@@ -1790,6 +1829,97 @@ class Culture:
             return filename
         else:
             return self.cultureFace
+    def nameOfCapital(self):
+        capitalName = "";
+        synonymSeed = seedNum(self.name)
+        if self.society in ["Monarchy","Imperium","Empire","Hegemony"]:
+            capitalName += synonym("palace",synonymSeed,0).capitalize()
+            if synonymSeed % 2 == 0:
+                capitalName += " of " + self.leader.name[1].title()
+            else:
+                capitalName += " of " + self.name.title()
+        #
+        #
+        elif self.society in ["Religious sovereignty",
+                      "Religious zealots",
+                      "Religious agriculturalists",
+                      "Religious collective"] or "shaman" in self.society.lower():
+            capitalName += synonym("cathedral",synonymSeed,0).title()
+            if synonymSeed % 2 == 0:
+                capitalName += " of " + self.favoriteDeity.justName()
+            else:
+                capitalName += " of " + self.name.title() + " "
+        #
+        #
+        elif "tribe" in self.society.lower():
+            capitalName += synonym("longhouse",synonymSeed,0).title()
+            if synonymSeed % 3 == 0:
+                capitalName += " of " + self.leader.name[1].title()
+            elif synonymSeed % 3 == 1:
+                capitalName += " of " + self.name
+        #
+        #
+        elif self.leaderCount > 1:
+            if synonymSeed % 2 == 0:
+                capitalName += "National "
+            else:
+                capitalName += self.name.capitalize() + " "
+            capitalName += synonym("parliament",synonymSeed,0).title()
+        #
+        #
+        else:
+            if synonymSeed % 2 == 0:
+                capitalName += "National "
+            capitalName += synonym("office",synonymSeed,0).title()
+            if synonymSeed % 2 == 1:
+                capitalName += " of " + self.name.title()
+        return capitalName
+    def nameOfTownHall(self,townName):
+        townName = townName.title()
+        capitalName = "";
+        synonymSeed = seedNum(self.name)
+        if self.society in ["Monarchy","Imperium","Empire","Hegemony"]:
+            capitalName += synonym("office",synonymSeed,0).title()
+            if synonymSeed % 2 == 0:
+                capitalName += " of " + self.leader.name[1].title()
+            else:
+                capitalName += " of " + self.name.title()
+        #
+        #
+        elif self.society in ["Religious sovereignty",
+                      "Religious zealots",
+                      "Religious agriculturalists",
+                      "Religious collective"] or "shaman" in self.society.lower():
+            capitalName += synonym("church",synonymSeed,0).title()
+            if synonymSeed % 2 == 0:
+                capitalName += " of " + self.favoriteDeity.justName()
+            else:
+                capitalName += " " + townName
+        #
+        #
+        elif "tribe" in self.society.lower():
+            capitalName += synonym("longhouse",synonymSeed,0).title()
+            if synonymSeed % 3 == 0:
+                capitalName += " of " + townName
+            elif synonymSeed % 3 == 1:
+                capitalName += " of " + self.name
+        #
+        #
+        elif self.leaderCount > 1:
+            if synonymSeed % 2 == 0:
+                capitalName += "Local "
+            else:
+                capitalName += townName + " "
+            capitalName += synonym("governance",synonymSeed,0).title()
+        #
+        #
+        else:
+            if synonymSeed % 2 == 0:
+                capitalName += "National "
+            else:
+                capitalName += self.name.capitalize() + " "
+            capitalName += synonym("office",synonymSeed,0).title()
+        return capitalName
     def shortName(self):
         name = ""
         name += self.name + " " + self.title
@@ -2917,7 +3047,7 @@ class Map:
         self.metalScale = 140000
         self.vegScale = 18295
         self.wildlifeScale = 1000
-        self.rscScale = 5
+        self.rscScale = 50
     def nodeInfo(self,n):
         self.divWidth = 64
         info = ""
@@ -3080,13 +3210,13 @@ class Map:
     def addShape(self,shape):
         if shape == "island" or shape == "volcanic":
             self.addSineHill(self.xDim/2,self.yDim/2,0.4,radius=random.uniform(0.6,1.1)*self.xDim/1.5)
+            self.smooth(2)
             if shape == "volcanic":
-                self.smooth(2)
                 self.elevationAdd(-0.1)
                 self.addSineHill(self.xDim/2,self.yDim/2,0.25,radius=random.uniform(0.6,1.1)*self.xDim*1.5)
                 self.smooth(1)
                 self.addHill(self.xDim/2,self.yDim/2,random.uniform(0.40,0.49),radius=random.uniform(0.6,1.1)*self.xDim/11)
-                self.addSineHill(self.xDim/2,self.yDim/2,-0.1,radius=random.uniform(0.6,1.1)*self.xDim/11)
+                self.addSineHill(self.xDim/2,self.yDim/2,-0.2,radius=random.uniform(0.6,1.1)*self.xDim/11)
         if shape == "shore" or shape == "highlands":
             corner = random.randint(0,3)
             if corner == 0:
@@ -3105,15 +3235,17 @@ class Map:
             if shape == "highlands":
                 self.addSineHill(xx,yy,0.3,radius=self.xDim)
                 self.addMountains()
+            self.smooth(2)
         if shape == "archipelago":
             self.addHills(16,0.25)
+            self.smooth(2)
         if shape == "plain":
             self.addSineHill(self.xDim/2,self.yDim/2,0.4,radius=self.xDim*5)
+            self.smooth(2)
         if shape != "volcanic":
             self.addMountains()
             self.addHills()
-            self.erode(3)
-            self.smooth(3)
+        self.smooth(3)
     def addRandomShape(self):
         shp = random.choice(["highlands","plain","volcanic","shore","archipelago","island"])
         self.addShape(shp)
@@ -3253,7 +3385,7 @@ class Map:
                    "shamans":0.15,
                    "freedom":-0.1,
                    "warriors":0.75,
-                   "worshippers":0.4,
+                   "worshippers":0.5,
                    "builders":0.25}
         self.values["movement"] = {"travelers":0.65,
                    "sailors":0.3,
@@ -3287,7 +3419,7 @@ class Map:
                    "astrology":0.1,
                    "metallurgists":0.4,
                    "warriors":0.2,
-                   "worshippers":0.15}
+                   "worshippers":0.2}
         self.values["growth"] = {"shamans":0.1,
                    "agriculture":0.55,
                    "naturalists":0.45,
@@ -3305,14 +3437,14 @@ class Map:
                    "traders":0.25,
                    "superstition":0.5,
                    "metallurgists":0.1,
-                   "worshippers":0.55,
+                   "worshippers":0.6,
                    "freedom":0.55,
                    "shamans":0.1,
                    "astrology":0.7,
                    "simplicity":0.4,
                    "builders":0.1}
         self.values["constellations"] = {"astrology":0.6,
-                   "superstition":0.25,
+                   "superstition":0.3,
                    "worshippers":0.3,
                    "freedom":0.15,
                    "materialists":-0.15,
@@ -3334,7 +3466,7 @@ class Map:
                    "builders":0.3,
                    "materialists":0.5,
                    "naturalists":0.35,
-                   "superstition":-0.25,
+                   "superstition":-0.2,
                    "simplicity":-0.3,
                    "collectivists":0.25,
                    "warriors":0.3,
@@ -3349,7 +3481,7 @@ class Map:
                    "materialists":-0.2,
                    "warriors":0.5,
                    "builders":-0.1}
-        self.values["ice"] = {"superstition":0.25,
+        self.values["ice"] = {"superstition":0.3,
                    "simplicity":-0.4,
                    "freedom":-0.4,
                    "travelers":-0.45,
@@ -4050,8 +4182,13 @@ class Map:
         self.townLbl.photo = photo
         self.townLbl.pack()
         self.cityString = StringVar()
+        structure = self.displayNo.structure()
         if self.displayNo.city != None:
             self.cityString.set(self.displayCity.city.cityNotes())
+            cdsc = Label(self.infoGui,textvariable=self.cityString)
+            cdsc.pack()
+        elif structure != None:
+            self.cityString.set(structure)
             cdsc = Label(self.infoGui,textvariable=self.cityString)
             cdsc.pack()
         self.displayCulture = self.displayNo.culture

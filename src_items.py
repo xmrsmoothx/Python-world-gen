@@ -159,7 +159,7 @@ class Item:
             s += "It is an object "
         if self.field != None:
             if self.kind in ["story","book","piece"]:
-                addition = synonym("about")
+                addition = synonym("about",seed=seedNum(self.name))
                 s += addition + " " + self.field
             else:
                 s += "decorated with imagery related to " + self.field
@@ -167,7 +167,7 @@ class Item:
         if self.subject != None:
             q = "work"
             if self.kind in ["helmet","weapon","bodice"]:
-                q = "engraving"
+                q = synonym("detail",seed=seedNum(self.name))
             try:
                 s += "The subject of the " + q + " is the " + self.subject.culture.name + " " + self.subject.nameFull() + ".\n"
             except AttributeError: 

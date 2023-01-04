@@ -129,11 +129,11 @@ def synonym(x,seed=0,exclusive=0):
     s["weapon"] = ["sword","spear","greatsword","longsword","blade","rapier",
      "hammer","axe","staff","sceptre","mace","lance","rifle","pistol"]
     s["helmet"] = ["helmet","helm","crown","circlet","coif","headdress","coronet","diadem","sallet","bascinet"]
-    s["bodice"] = ["bodice","breastplate","hauberk","mail coat","brigandine","lamellar","platemail","cuirass","coat"]
+    s["bodice"] = ["bodice","breastplate","hauberk","mail","brigandine","lamellar","platemail","cuirass","coat","vest"]
     s["paper"] = ["paper","parchment","vellum","slate","papyrus","bamboo","eelskin","rawhide","sandstone"]
     s["wood"] = ["wood","oak","maple","mahogany","pine","birch","hickory","fir"]
     s["stone"] = ["stone","granite","basalt","obsidian","limestone","sandstone","slate","marble","gneiss"]
-    s["metal"] = ["metal","alloy","steel","iron","bronze","brass","copper","silver","gold","titanium","aluminium","tin","nickel"]
+    s["metal"] = ["metal","steel","iron","bronze","brass","copper","silver","gold","titanium","aluminium","tin","nickel","electrum"]
     s["paint"] = ["paint","oil","acrylic","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
     s["weaponry"] = ["weaponry","combat","artillery","blades","war","battle","assault"]
     s["defense"] = ["defense","combat","armor","war","battle","siege","fortification"]
@@ -150,7 +150,7 @@ def synonym(x,seed=0,exclusive=0):
     s["artillery"] = ["artillery","howitzers","catapults","trebuchets","ballistas","cannons"]
     s["assault infantry"] = ["assault infantry","warriors","troopers","soldiers","infantrymen","fighters","brigade"]
     s["mechanized"] = ["mechanized","tanks","armored","engineers"]
-    s["cavalry"] = ["cavalry","horseback riders","mounted","lancers","cuirassers","horseback brigade","dragoons","hussars"]
+    s["cavalry"] = ["cavalry","horseback riders","mounted","lancers","cuirassiers","horseback brigade","dragoons","hussars"]
     s["guard infantry"] = ["guard infantry","garrison","sentinels","defensive brigade","guardsmen","reserve"]
     s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carbiners"]
     s["siege"] = ["siege","siege towers","battering rams","demolitionists","blockades","sappers"]
@@ -158,6 +158,14 @@ def synonym(x,seed=0,exclusive=0):
      "investigating","on","concerning","relating to","challenging","exploring","pondering"]
     s["water"] = ["water","moisture","rain","rainfall","irrigation","fluids","humidity"]
     s["magic"] = ["magic","witchcraft","wizardry","miracles","sorcery","alchemy","divination","voodoo","necromancy","thaumaturgy"]
+    s["church"] = ["church","cathedral","parish","chapel","temple","mosque","basilica","shrine","sanctuary","abbey"]
+    s["cathedral"] = ["cathedral","basilica","grand mosque","archbasilica","grand cathedral","shrine","abbey"]
+    s["palace"] = ["palace","castle","citadel","keep","throne","court"]
+    s["parliament"] = ["parliament","congress","capital","legislature","assembly","senate","citadel","house"]
+    s["governance"] = ["governance","council","hall","assembly","town hall"]
+    s["office"] = ["office","statehouse","seat","headquarters","chamber","courthouse"]
+    s["longhouse"] = ["longhouse","hall","chief's tent","meeting hall","court","fort","stronghold","grand hall"]
+    s["detail"] = ["detail","engraving","filigree","embossing","brushwork","chiseling"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)

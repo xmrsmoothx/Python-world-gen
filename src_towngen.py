@@ -14,7 +14,7 @@ import matplotlib.path as mpltPath
 from src_tools import *
 
 XDIM = 720
-BORDERSCALE = 1/10
+BORDERSCALE = 1/12
 STREETRANGE = 6400
 
 def chaoticFunction(x):
@@ -88,7 +88,15 @@ class StreetNode:
         self.type = None
         self.drawColor = (0,0,0)
         self.road = False
+        self.node = None
     def dist(self,x,y):
+        dx = abs(self.x-x)
+        dy = abs(self.y-y)
+        dist = math.sqrt((dx**2) + (dy**2))
+        return dist
+    def nodeDist(self,n):
+        x = n.x
+        y = n.y
         dx = abs(self.x-x)
         dy = abs(self.y-y)
         dist = math.sqrt((dx**2) + (dy**2))
@@ -150,24 +158,8 @@ class Block:
             yy = 0
         self.x = xx
         self.y = yy
+        self.orderccw()
         return [self.x,self.y]
-    def ccw(self,p0,p1,c):
-        # Return 1 if p1 is counterclockwise from p0 with c as center; otherwise, return 0
-        cx = c[0]
-        cy = c[1]
-        v0 = (p0.x-cx,p0.y-cy)
-        v1 = (p1.x-cx,p1.y-cy)
-        d0 = enorm(v0[0],v0[1])
-        d1 = enorm(v1[0],v1[1])
-        dp = (v0[0]*v1[0]) + (v0[1]*v1[1])
-        if d0*d1 == 0:
-            return 0
-        q = clamp(dp/exclus(d0*d1),-1,1)
-        ang = math.acos(q)
-        if ang >= 0:
-            return 1
-        else:
-            return 0
     def blockDist(self,x,y):
         self.centroid()
         dx = self.x-x
@@ -186,35 +178,25 @@ class Block:
                 s += 1
         return s
     def orderccw(self):
-        n = len(self.verts)
-        for i in range(n):
-            for j in range(n):
-                aa = j
-                bb = (j+1) % n
-                if self.ccw(self.verts[aa],self.verts[bb],self.centroid()) == 0:
-                    # bb not ccw from aa
-                    t = self.verts[aa]
-                    self.verts[aa] = self.verts[bb]
-                    self.verts[bb] = t
-        self.verts = list(reversed(self.verts))
-    def polyArea(self):
-        if len(self.verts) < 1:
-            self.area = 0
-            return 0
-        self.orderccw()
-        area = 0
-        q = self.verts[-1]
-        for p in self.verts:
-            area += (p.x * q.y) - (p.y * q.x)
-            q = p
-        area = abs(area/2)
-        self.area = area
-        return area
+        self.verts.sort(key=lambda a: math.atan2(float(self.x-a.x),float(self.y-a.y)))
+    def drawRoads(self,drawer):
+        dCol = Tools.streetColor
+        if len(self.verts) < 3:
+            return -1
+        vts = [(p.x,p.y) for p in self.verts]
+        vts.append(vts[0])
+        dCol = Tools.streetColor
+        drawer.line(vts,dCol,3)
     def drawSelf(self,drawer):
         dCol = self.col
         if len(self.verts) > 1:
             vts = [(p.x,p.y) for p in self.verts]
-            drawer.polygon(vts,dCol,dCol)
+            if self.blockDist(self.myTown.x,self.myTown.y) < self.myTown.radius and self.col != Tools.waterColor:
+                dCol = Tools.streetColor
+                bCol = Tools.buildingColor
+                drawer.polygon(vts,bCol,dCol)
+            else:
+                drawer.polygon(vts,dCol,dCol)
 
 class Town:
     def __init__(self,n,m,nom):
@@ -227,12 +209,33 @@ class Town:
         self.landColor = self.myMap.biomeColors[self.node.biome]
         self.streetColor = Tools.streetColor
         self.waterColor = Tools.waterColor
-        cnt = 512
+        self.x = self.xDim/2
+        self.y = self.yDim/2
+        if self.node.city != None:
+            self.population = self.node.city.population
+            self.wateryNeighbors = [u for u in self.node.neighbors if u.watery() == 1]
+            self.radius = math.floor(22+(self.population**(17/40)))*(1+(len(self.wateryNeighbors)/10))
+            if self.node.river != None:
+                self.radius = self.radius+16
+        else:
+            self.population = 0
+            self.radius = 0
+        cnt = 1024
         sd = (self.node.x*73)+(self.node.y*37)
         random.seed(sd)
         buffer = 32
         verts = [[random.randint(buffer,self.xDim-buffer),random.randint(buffer,self.yDim-buffer)] for i in range(cnt)]
         verts.append([self.xDim/2,self.yDim/2])
+        gridSize = 20
+        for p in verts:
+            if random.random() < 0.5:
+                p[0] = round(p[0]/gridSize)*gridSize
+                p[1] = round(p[1]/gridSize)*gridSize
+            else:
+                if random.random() < 0.5:
+                    p[1] = round(p[1]/gridSize)*gridSize
+                else:
+                    p[0] = round(p[0]/gridSize)*gridSize
         verts = np.asarray(verts)
         primVor = Voronoi(verts)
         self.streetNodes = [StreetNode(i) for i in primVor.vertices]
@@ -256,37 +259,22 @@ class Town:
                     i.neighborize(j)
         for k in self.blocks:
             k.centroid()
-        if self.node.city != None:
-            self.population = self.node.city.population
-            self.wateryNeighbors = [u for u in self.node.neighbors if u.watery() == 1]
-            self.radius = math.floor(28+(math.sqrt(self.population)))*(1+(len(self.wateryNeighbors)/3))
-            if self.node.river != None:
-                self.radius = self.radius+36
-            polygonSides = 5 + (sd % 7)
-            centerX = XDIM/2;
-            centerY = XDIM/2;
-            self.polygon = [[centerX+(math.sin(6.283*u/polygonSides)*self.radius)+((u*sd) % 31),centerY+(math.cos(6.283*u/polygonSides)*self.radius)+((u*sd) % 29)] for u in range(math.floor(polygonSides))]
-        else:
-            self.population = 0
-            self.radius = 0
-        self.x = self.xDim/2
-        self.y = self.yDim/2
         self.neighborPts = []
         for n in self.node.neighbors:
-            d = n.dist(self.node)
-            scl = self.xDim/d
-            dx = (n.x-self.node.x)*scl
-            dy = (n.y-self.node.y)*scl
-            while (abs(dx) < self.xDim/2 or abs(dy) < self.yDim/2) and n.river != None and n.bodyWater == None:
-                dx *= 1.1
-                dy *= 1.1
+            xReal = n.x - self.node.x
+            yReal = n.y - self.node.y
+            realDist = n.dist(self.node)
+            optimalDist = math.sqrt((self.xDim**2)+(self.yDim**2))
+            distMultiplier = optimalDist/realDist
+            dx = xReal*distMultiplier
+            dy = yReal*distMultiplier
             buffer = 16
-            xx = clamp(self.x + dx,buffer,self.xDim-buffer)
-            yy = clamp(self.y + dy,buffer,self.yDim-buffer)
+            xx = clamp((self.xDim/2) + dx,buffer,self.xDim-buffer)
+            yy = clamp((self.yDim/2) + dy,buffer,self.yDim-buffer)
             s = StreetNode([xx,yy])
             if n.river != None:
                 s.type = "river"
-                s.drawCol = self.waterColor
+                s.drawCol = n.myMap.biomeColors[n.biome]
             if n.bodyWater != None:
                 s.type = "water"
                 s.drawCol = self.waterColor
@@ -295,22 +283,38 @@ class Town:
                 #s.drawCol = colAvg(n.myMap.biomeColors[n.biome],self.landColor)
             if len(n.roads) > 0:
                 s.road = True
+            s.node = n
             self.neighborPts.append(s)
-        for p in self.neighborPts:
-            if p.type != "river":
-                for k in range(len(self.blocks)):
-                    kk = self.blocks[k].centroid()
-                    if (self.blocks[k].blockDist(p.x,p.y) < self.x*0.9):
-                        self.blocks[k].type = p.type
-                        self.blocks[k].col = p.drawCol
-            if p.type == "river"  or p.type == "water":
-                if self.node.river != None:
-                    self.buildRiver(p,self.nearestBlock(self.x,self.y))
+        for b in self.blocks:
+            d = 10000;
+            nearestNeighbor = self.neighborPts[0]
+            for p in self.neighborPts:
+                if b.blockDist(p.x,p.y) < d:
+                    d = b.blockDist(p.x,p.y)
+                    nearestNeighbor = p
+            if b.blockDist(self.xDim/2,self.yDim/2) > d*0.75:
+                b.type = nearestNeighbor.type
+                b.col = nearestNeighbor.drawCol
+        if self.node.river != None:
+            riverPrevious = self.node.riverPrevious()
+            riverNext = self.node.riverNext()
+            for p in self.neighborPts:
+                if p.node == riverPrevious or p.node == riverNext or p.type == "water":
+                    self.buildRiver(p,self.nearestBlock(self.xDim/2,self.yDim/2))
         for b in self.blocks:
             for f in self.blocks:
                 if (b.sharedNeighbors(f) >= 2 and
                     b.type == "water"):
                     f.col = self.waterColor
+        if self.node.watery() == 1:
+            for f in self.blocks:
+                f.col = self.waterColor
+        if self.node.city != None:
+            if self.nearestBlock(self.x,self.y).col == self.waterColor:
+                newCenter = self.nearestSolidBlock(self.x,self.y)
+                newCenter.centroid()
+                self.x = newCenter.x
+                self.y = newCenter.y
         for f in self.blocks:
             if f.col == self.waterColor:
                 f.type = "water"
@@ -324,8 +328,16 @@ class Town:
                 d = dd
                 a = k
         return a
+    def nearestSolidBlock(self,xx,yy):
+        d = 100000
+        a = self.blocks[0]
+        for k in self.blocks:
+            dd = k.blockDist(xx,yy)
+            if dd < d and len(k.neighbors) > 0 and k.col != self.waterColor:
+                d = dd
+                a = k
+        return a
     def buildRiver(self,n0,b1):
-        #probably scrap this and remake
         current = self.nearestBlock(n0.x,n0.y)
         bx = b1.centroid()[0]
         by = b1.centroid()[1]
@@ -365,26 +377,23 @@ class Town:
     def drawRoads(self,image):
         drawer = ImageDraw.Draw(image)
         dCol = Tools.streetColor
-        bCol = Tools.buildingColor
-        centerX = XDIM/2
-        centerY = XDIM/2
+        roadRadius = 3
         if self.node.city != None:
-            matPath = mpltPath.Path(self.polygon)
-            for xx in range(math.floor(XDIM-(XDIM*BORDERSCALE*2))):
-                for yy in range(math.floor(XDIM-(XDIM*BORDERSCALE*2))):
-                    x = xx+(XDIM*BORDERSCALE)
-                    y = yy+(XDIM*BORDERSCALE)
-                    if matPath.contains_point((x,y)):
-                        if (image.getpixel((x,y))) not in [(0,0,0),self.waterColor]:
-                            if xStreets(x,self.name) or yStreets(y,self.name):
-                                drawer.point((x,y),dCol)
-                            else:
-                                drawer.point((x,y),bCol)
-        roadRadius = 1.5
-        for neighbor in self.neighborPts:
-            if neighbor.road == True:
-                drawCircle(drawer,centerX,centerY,roadRadius,dCol)
-                drawer.line([(neighbor.x,neighbor.y),(centerX,centerY)],dCol,math.floor(roadRadius*2))
+            for neighbor in self.neighborPts:
+                if neighbor.road == True:
+                    drawer.line([(neighbor.x,neighbor.y),(self.x,self.y)],dCol,math.floor(roadRadius*2))
+        else:
+            for neighbor in self.neighborPts:
+                if neighbor.road == True:
+                    for otherNeighbor in self.neighborPts:
+                        if otherNeighbor.x != neighbor.x and otherNeighbor.y != neighbor.y and otherNeighbor.road == True:
+                            drawer.line([(neighbor.x,neighbor.y),(otherNeighbor.x,otherNeighbor.y)],dCol,math.floor(roadRadius*2))
+        for k in self.blocks:
+            if k.blockDist(self.x,self.y) < self.radius and k.col != Tools.waterColor:
+                k.drawSelf(drawer)
+        for k in self.blocks:
+            if k.blockDist(self.x,self.y) < self.radius and k.col != Tools.waterColor:
+                k.drawRoads(drawer)
         scl = 1/BORDERSCALE
         h = self.yDim/scl
         w = self.xDim/scl
