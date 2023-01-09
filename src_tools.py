@@ -17,32 +17,6 @@ def getPrime(num):
 def nearestHundred(largeNum):
     return round(largeNum/100)*100
 
-class noiseMaker:
-    def __init__(self,w,h):
-        self.noise = np.random.rand(w,h)
-        self.width = w
-        self.height = h
-    def smoothNoise(self,xx,yy):
-        fracX = xx % 1
-        fracY = yy % 1
-        x1 = (math.floor(xx)+self.width) % self.width
-        y1 = (math.floor(yy)+self.height) % self.height
-        x2 = (x1+self.width-1) % self.width
-        y2 = (y1+self.height-1) % self.height
-        tileVal = 0
-        tileVal += fracX*fracY*self.noise[x1,y1]
-        tileVal += (1-fracX)*fracY*self.noise[x2,y1]
-        tileVal += fracX*(1-fracY)*self.noise[x1,y2]
-        tileVal += (1-fracX)*(1-fracY)*self.noise[x2,y2]
-        return tileVal
-    def turbulence(self,xx,yy,size):
-        tileVal = 0
-        initialSize = size
-        while size >= 1:
-            tileVal += self.smoothNoise(xx/size,yy/size)*size
-            size = size/2
-        return tileVal/(initialSize*2)
-
 class Tools:
     streetColor = (16,120,104)
     waterColor = (142,96,64)
@@ -56,8 +30,8 @@ def clamp(x,minimum,maximum):
     else:
         return x
 
-def discreteBlocks(x,y,s):
-    return 1
+def distance3d(a,b):
+    return math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2)
 
 def ordinal(x):
     o = str(x)
@@ -130,6 +104,7 @@ def synonym(x,seed=0,exclusive=0):
      "hammer","axe","staff","sceptre","mace","lance","rifle","pistol"]
     s["helmet"] = ["helmet","helm","crown","circlet","coif","headdress","coronet","diadem","sallet","bascinet"]
     s["bodice"] = ["bodice","breastplate","hauberk","mail","brigandine","lamellar","platemail","cuirass","coat","vest"]
+    s["shield"] = ["shield","buckler","kite shield","tower shield","targe","pavise","roundshield","greatshield","small shield"]
     s["paper"] = ["paper","parchment","vellum","slate","papyrus","bamboo","eelskin","rawhide","sandstone"]
     s["wood"] = ["wood","oak","maple","mahogany","pine","birch","hickory","fir"]
     s["stone"] = ["stone","granite","basalt","obsidian","limestone","sandstone","slate","marble","gneiss"]
@@ -165,7 +140,7 @@ def synonym(x,seed=0,exclusive=0):
     s["governance"] = ["governance","council","hall","assembly","town hall"]
     s["office"] = ["office","statehouse","seat","headquarters","chamber","courthouse"]
     s["longhouse"] = ["longhouse","hall","chief's tent","meeting hall","court","fort","stronghold","grand hall"]
-    s["detail"] = ["detail","engraving","filigree","embossing","brushwork","chiseling"]
+    s["detail"] = ["detail","engraving","filigree","embossing","brushwork","chiseling","paint"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)
@@ -182,3 +157,29 @@ def seedNum(s):
     for k in s:
         v += ord(k)
     return v
+
+class noiseMaker:
+    def __init__(self,w,h):
+        self.noise = np.random.rand(w,h)
+        self.width = w
+        self.height = h
+    def smoothNoise(self,xx,yy):
+        fracX = xx % 1
+        fracY = yy % 1
+        x1 = (math.floor(xx)+self.width) % self.width
+        y1 = (math.floor(yy)+self.height) % self.height
+        x2 = (x1+self.width-1) % self.width
+        y2 = (y1+self.height-1) % self.height
+        tileVal = 0
+        tileVal += fracX*fracY*self.noise[x1,y1]
+        tileVal += (1-fracX)*fracY*self.noise[x2,y1]
+        tileVal += fracX*(1-fracY)*self.noise[x1,y2]
+        tileVal += (1-fracX)*(1-fracY)*self.noise[x2,y2]
+        return tileVal
+    def turbulence(self,xx,yy,size):
+        tileVal = 0
+        initialSize = size
+        while size >= 1:
+            tileVal += self.smoothNoise(xx/size,yy/size)*size
+            size = size/2
+        return tileVal/(initialSize*2)

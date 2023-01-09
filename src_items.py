@@ -85,7 +85,7 @@ class Item:
                             n += " " + self.culture.language.genName()
                     else:
                         n = subname
-            if self.kind in ["weapon","helmet","bodice"]:
+            if self.kind in ["weapon","helmet","bodice","shield"]:
                 roll = random.random()
                 self.subkind = synonym(self.kind)
                 n = "the "
@@ -138,7 +138,7 @@ class Item:
         elif self.subkind in ["sculpture","statue","bust","etching"]:
             self.material = synonym("stone",seedNum(self.name))
             s += "It is made of " + self.material
-        elif self.subkind in ["woodcut"]:
+        elif self.subkind in ["woodcut","shield"]:
             self.material = synonym("wood",seedNum(self.name))
             s += "It is made of " + self.material
         elif self.kind in ["weapon","helmet","bodice"]:
@@ -166,7 +166,7 @@ class Item:
             s += ".\n"
         if self.subject != None:
             q = "work"
-            if self.kind in ["helmet","weapon","bodice"]:
+            if self.kind in ["helmet","weapon","bodice","shield"]:
                 q = synonym("detail",seed=seedNum(self.name))
             try:
                 s += "The subject of the " + q + " is the " + self.subject.culture.name + " " + self.subject.nameFull() + ".\n"
