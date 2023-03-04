@@ -378,7 +378,8 @@ class Town:
         drawer = ImageDraw.Draw(image)
         dCol = Tools.streetColor
         roadRadius = 3
-        if self.node.city != None:
+        numRoads = len([i for i in self.neighborPts if i.road == True])
+        if self.node.city != None or numRoads > 2:
             for neighbor in self.neighborPts:
                 if neighbor.road == True:
                     drawer.line([(neighbor.x,neighbor.y),(self.x,self.y)],dCol,math.floor(roadRadius*2))

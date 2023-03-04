@@ -53,6 +53,11 @@ def techTier(lv):
     return clamp(((2**((steepness*lv)-2))/((2**((steepness*lv)-2))+3))*(5.8*(1.002**lv))-0.4,0,8)
     
 
+def talentTier(talent):
+    tier = math.floor(talent*10)
+    tiersList = ["poor","poor","fair","fair","fair","skillful","skillful","skillful","masterful","legendary","legendary"]
+    return tiersList[tier]
+
 def synonym(x,seed=0,exclusive=0):
     s = {}
     s["mountain"] = ["mountain","peak","ridge"]
@@ -102,7 +107,7 @@ def synonym(x,seed=0,exclusive=0):
      "tapestry","fresco","mural","concerto","song","sonnet","ballad"]
     s["weapon"] = ["sword","spear","greatsword","longsword","blade","rapier",
      "hammer","axe","staff","sceptre","mace","lance","rifle","pistol"]
-    s["helmet"] = ["helmet","helm","crown","circlet","coif","headdress","coronet","diadem","sallet","bascinet"]
+    s["helmet"] = ["helmet","helm","crown","circlet","coif","headdress","coronet","diadem","sallet","bascinet","burgonet"]
     s["bodice"] = ["bodice","breastplate","hauberk","mail","brigandine","lamellar","platemail","cuirass","coat","vest"]
     s["shield"] = ["shield","buckler","kite shield","tower shield","targe","pavise","roundshield","greatshield","small shield"]
     s["paper"] = ["paper","parchment","vellum","slate","papyrus","bamboo","eelskin","rawhide","sandstone"]
@@ -139,7 +144,7 @@ def synonym(x,seed=0,exclusive=0):
     s["parliament"] = ["parliament","congress","capital","legislature","assembly","senate","citadel","house"]
     s["governance"] = ["governance","council","hall","assembly","town hall"]
     s["office"] = ["office","statehouse","seat","headquarters","chamber","courthouse"]
-    s["longhouse"] = ["longhouse","hall","chief's tent","meeting hall","court","fort","stronghold","grand hall"]
+    s["longhouse"] = ["longhouse","hall","tent","meeting hall","court","fort","stronghold","grand hall"]
     s["detail"] = ["detail","engraving","filigree","embossing","brushwork","chiseling","paint"]
     syn = x
     if x in s.keys():

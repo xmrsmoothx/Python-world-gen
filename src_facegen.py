@@ -57,6 +57,7 @@ class Face:
         self.partleft = ((self.hairlength/self.xDim)*2*60)*random.uniform(0.7,1.3)
         self.partright = ((self.hairlength/self.xDim)*2*60)*random.uniform(0.7,1.3)
         self.earsize = self.earsize*random.uniform(0.9,1.1)
+        self.height = self.height*random.uniform(0.9,1.1)
     def clampVals(self):
         self.headheight = clamp(self.headheight,self.xDim*0.7,self.xDim*0.75)
         self.headwidth = clamp(self.headwidth,self.xDim*0.5,self.xDim*0.65)
@@ -70,6 +71,7 @@ class Face:
         self.hairlength = clamp(self.hairlength,0,self.xDim*0.7)
         self.hairthickness = clamp(self.hairthickness,1,7)
         self.earsize = clamp(self.earsize,6,10)
+        self.height = clamp(self.height,1.3,2.1)
     def generateCultureFace(self):
         random.seed(self.culture.name)
         inf = self.culture.value.influences.envInfluences
@@ -99,6 +101,7 @@ class Face:
         self.partleft = ((self.hairlength/self.xDim)*2*60)*random.uniform(0.7,1.3)
         self.partright = ((self.hairlength/self.xDim)*2*60)*random.uniform(0.7,1.3)
         self.earsize = (6+(5.3*humidity))*random.uniform(0.8,1.2)
+        self.height = random.uniform(1.45,2.00)
         self.clampVals()
     def generateFace1(self,parent):
         self.headheight = parent.headheight
@@ -116,6 +119,7 @@ class Face:
         self.hairlength = parent.hairlength
         self.hairthickness = parent.hairthickness
         self.earsize = parent.earsize
+        self.height = parent.height
         self.shiftVals()
         self.clampVals()
     def generateFace2(self,parent1,parent2):
@@ -141,6 +145,7 @@ class Face:
         self.hairlength = avg2(parent1.hairlength,parent2.hairlength)
         self.hairthickness = avg2(parent1.hairthickness,parent2.hairthickness)
         self.earsize = avg2(parent1.earsize,parent2.earsize)
+        self.height = avg2(parent1.height,parent2.height)
         self.shiftVals()
         self.clampVals()
     def drawSelf(self,drawer):

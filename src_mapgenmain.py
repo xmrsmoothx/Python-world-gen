@@ -309,7 +309,9 @@ class Node:
         if n.watery() == 1:
             inc *= 1
         if self.dist(n) > 32:
-            inc *= 16
+            inc *= 32
+        if self.biome != n.biome:
+            inc *= 2
         n.allegiance = self.allegiance+inc
         if self.culture.name not in n.region.culturalNames:
             n.region.culturalNames[self.culture.name] = self.culture.language.genName()
@@ -333,16 +335,17 @@ class Node:
                     self.claim(n,sealevel)
     def structure(self):
         structureSeed = int(self.name)
-        possibleStructures = ["farm","inn","brothel","factory","mine","fort","farm","farm","farm","farm","farm","inn","mine"]
+        possibleStructures = ["farm","inn","brothel","workshop","mine","fort","farm","farm","farm","farm","farm","farm","inn","mine"]
         if self.city != None:
             return None
         if self.resourceRegion == None:
             return None
         if self.watery() == 1:
             return None
-        if structureSeed % 2 == 0:
-            return None
-        return possibleStructures[structureSeed % len(possibleStructures)]
+        for k in range(9):
+            if k != 0 and structureSeed % k == 0 and k >= self.resourceRegion.rootCity.cityTier:
+                return possibleStructures[structureSeed % len(possibleStructures)]
+        return None
     def toString(self):
         self.selfString = "("
         self.selfString += str(self.x)
@@ -389,6 +392,22 @@ class Node:
         for n in self.neighbors:
             if n in self.roads:
                 drawer.line([self.coords(),n.coords()],roadCol,2)
+    def drawFort(self,drawer,xx,yy,col,out):
+        p1 = (xx-2,yy+2)
+        p2 = (xx,yy+4)
+        p3 = (xx+2,yy+2)
+        p4 = (xx+2,yy-3)
+        p5 = (xx-2,yy-3)
+        drawer.polygon([p1,p2,p3,p4,p5],outline=out,fill=col)
+        pts = [(xx+2,yy-4),(xx,yy-4),(xx-2,yy-4),(xx,yy-1),(xx,yy)]
+        drawer.point(pts,fill=out)
+    def drawSelf(self,drawer):
+        if self.structure() == None:
+            return
+        col = self.resourceRegion.culture.bannerColor
+        out = (0,0,0)
+        if self.structure() == "fort":
+            self.drawFort(drawer,self.x,self.y,col,out)
     def drawTownGen(self):
         self.townGen = Town(self,self.myMap,self.name)
         townImg = Image.new("HSV",(self.townGen.xDim,self.townGen.yDim),(0,0,255))
@@ -799,6 +818,7 @@ class City:
         self.node = n
         self.node.city = self
         self.population = pop
+        self.cityTier = 6
         self.popThresholds = [40,200,1000,10000,50000]
         self.culture = None
         if cltr == None:
@@ -827,6 +847,7 @@ class City:
         self.foodProduction = 1
         self.age = 0
         self.roads = []
+        self.linkedRoads = []
         self.kind = "city"
         e = Event(self.culture.myMap,a=self.age,kind="founding",sub=self,actrs=[self.culture.leader])
         e.importance = random.randint(10,40)+clamp(math.floor(math.sqrt(self.population)),0,25)
@@ -872,21 +893,20 @@ class City:
         mpo = random.uniform(0.097,0.101)   # Maximum personal output (max resources production per person)
         m = self.culture.value.mainValues
         if "agriculture" in m:
-            mpo *= 1.07
+            mpo *= 1.06
         if "simplicity" in m:
             mpo *= 0.85
-        if "warriors" in m:
-            mpo *= 1.04
         if "builders" in m:
-            mpo *= 1.04
+            mpo *= 1.03
         if "metallurgists" in m:
-            mpo *= 1.04
+            mpo *= 1.03
         if "craftsmen" in m:
-            mpo *= 1.04
+            mpo *= 1.03
         if "collectivists" in m:
             mpo *= 1.03
         mpo = mpo*math.sqrt(self.culture.tech["production"])
         self.foodProduction = min(self.population*mpo,rscMax[0])
+        self.foodProduction *= math.sqrt(self.culture.tech["agriculture"])
         self.industrialProduction = min(self.population*mpo,rscMax[1])
         mpc = random.uniform(0.079,0.083)     # Maximum personal consumption (max food needed per person)
         mpc -= 0.002*(math.log10(clamp(self.population,1,1000000))+2)
@@ -911,6 +931,7 @@ class City:
         self.population = clamp(math.floor(self.population+growth+random.choice([-1,0,0,0,0,1])),1,10000000)
         self.cityType = self.cType(self.population)
         self.diaspora()
+        self.cType(self.population)
     def diaspora(self):
         self.threshold = 1500*(0.99**self.age)
         roll = random.random()
@@ -955,19 +976,27 @@ class City:
             emigrants += bcount
             self.population = clamp(self.population-emigrants,1,10000000)
             self.age = 0
+            self.linkedRoads.append(cc)
     def cType(self,p):
         if p <= self.popThresholds[0]:
             c = synonym("camp",seedNum(self.name))
+            cTier = 7
         elif p <= self.popThresholds[1]:
             c = synonym("village",seedNum(self.name))
+            cTier = 6
         elif p <= self.popThresholds[2]:
             c = synonym("township",seedNum(self.name))
+            cTier = 5
         elif p <= self.popThresholds[3]:
             c = "town"
+            cTier = 4
         elif p <= self.popThresholds[4]:
             c = "city"
+            cTier = 3
         else:
             c = "metropolis"
+            cTier = 2
+        self.cityTier = min(cTier,self.cityTier)
         return c.capitalize()
     def governanceName(self):
         if self.culture.origin == self.node:
@@ -1308,6 +1337,7 @@ class Culture:
         self.cultureFace = None
         self.cultureOpinions = {}
         self.strength = 1
+        self.tradeAgreements = {}
     def strengthCalc(self):
         self.strength = 1 + math.sqrt(self.populationCount()*3)
         for c in self.cities:
@@ -1817,7 +1847,7 @@ class Culture:
             e.importance = 100
         self.deities.append(f)
         for k in range(clamp(maxtiers-tiers,1,maxtiers),tiers):
-            entities = math.ceil((random.randint(0,2)+k)/2)
+            entities = math.ceil((random.randint(0,2)+k)/3)
             if random.random() < 0.3:
                 entities = 0
             if random.random() < 0.25:
@@ -2044,7 +2074,7 @@ class Opinion:
     def __init__(self,c,o):
         self.culture = c
         self.other = o
-        self.falloffDist = 200
+        self.falloffDist = 150
         # 0 - no knowledge; 1 - only know of each other; 2 - contact.
         self.knowledge = 0
         # [Hostility, Strength, Intervention]
@@ -2057,8 +2087,12 @@ class Opinion:
         self.status = [0,0,0]
         self.activeActions = []
         self.distance = 1000
+        self.roads = 0
+        self.war = 0
+        self.culture.tradeAgreements[self.other.name] = False
+        self.other.tradeAgreements[self.culture.name] = False
     def addStatus(self,additions,r=True):
-        distanceEffect = clamp((self.falloffDist*2)/self.distance,0.5,1)
+        distanceEffect = clamp((self.falloffDist*2)/self.distance,0.25,1)
         self.status[0] = clamp((self.status[0]+additions[0])*random.uniform(0.7,1.3)*distanceEffect,-1,1)
         self.status[1] = clamp((self.status[1]+additions[1])*random.uniform(0.7,1.3)*distanceEffect,-1,1)
         self.status[2] = clamp((self.status[2]+additions[2])*random.uniform(0.7,1.3)*distanceEffect,-1,1)
@@ -2123,11 +2157,11 @@ class Opinion:
         if self.culture.society in ["Imperiun","Empire","Hegemony","Monarchy",
                                     "Religious Zealots","Revolutionary Commune",
                                     "Shamanistic Warriors"]:
-            addedHostility += 0.0002
-            addedIntervention += 0.0002
+            addedHostility += 0.0003
+            addedIntervention += 0.0003
         if self.culture.society in ["Pirates","Raiders"]:
-            addedHostility += 0.0008
-            addedIntervention += 0.0008
+            addedHostility += 0.0009
+            addedIntervention += 0.0009
         distToCapital = n.dist(self.culture.origin)
         addedHostility *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
         addedIntervention *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
@@ -2176,11 +2210,11 @@ class Opinion:
         if self.culture.society in ["Imperiun","Empire","Hegemony","Monarchy",
                                     "Religious Zealots","Revolutionary Commune",
                                     "Shamanistic Warriors"]:
-            addedHostility += 0.0002
-            addedIntervention += 0.0002
+            addedHostility += 0.0004
+            addedIntervention += 0.0004
         if self.culture.society in ["Pirates","Raiders"]:
-            addedHostility += 0.001
-            addedIntervention += 0.001
+            addedHostility += 0.0014
+            addedIntervention += 0.0014
         distToCapital = n.dist(self.culture.origin)
         addedHostility *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
         addedIntervention *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
@@ -2188,6 +2222,7 @@ class Opinion:
     def updateOpinion(self):
         self.distance = self.culture.origin.dist(self.other.origin)
         self.activeActions = []
+        otherOpinion = self.other.cultureOpinions[self.culture.name]
         actions = {}
         # last item in the list is the radius of the action
         actions["war"] = [1,0.4,1,1]
@@ -2201,43 +2236,74 @@ class Opinion:
         addedIntervention = 0.00
         m = self.culture.value.mainValues
         otherM = self.other.value.mainValues
-        if self.knowledge > 0:
+        if self.culture.society in ["Pirates","Raiders"] or self.other.society in ["Pirates","Raiders"]:
+            addedHostility += 0.04
+        if (self.culture.society in ["Imperiun","Empire","Hegemony","Monarchy",
+                                    "Religious Zealots","Revolutionary Commune",
+                                    "Shamanistic Warriors"] 
+                or self.other.society in ["Imperiun","Empire","Hegemony","Monarchy",
+                                    "Religious Zealots","Revolutionary Commune",
+                                    "Shamanistic Warriors"]):
+            addedHostility += 0.03
+        if self.culture.society in ["Scholars","Astronomers"]:
+            addedIntervention -= 0.01
+        if self.knowledge == 1:
             if "warriors" in m:
                 addedHostility += 0.015
-                addedIntervention += 0.005
+                addedIntervention += 0.003
             if "traders" in m:
-                addedHostility -= 0.015
-                addedIntervention += 0.005
-            if "craftsmen" in m:
                 addedHostility -= 0.005
-                addedIntervention += 0.005
+                addedIntervention += 0.003
             if "collectivists" in m:
-                addedHostility -= 0.01
-                addedIntervention += 0.005
+                addedHostility -= 0.002
+                addedIntervention += 0.002
         elif self.knowledge > 1:
             for v in m:
                 if v in otherM:
                     if v == "warriors":
-                        addedHostility += 0.05
-                    elif v == "worshippers":
                         addedHostility += 0.02
-                        addedIntervention += 0.01
+                    elif v == "worshippers":
+                        addedHostility += 0.005
+                        addedIntervention += 0.005
                     elif v == "traders":
-                        addedHostility -= 0.03
-                        addedIntervention += 0.03
+                        addedHostility -= 0.005
+                        addedIntervention += 0.005
                     elif v == "freedom":
-                        addedIntervention -= 0.01
+                        addedIntervention -= 0.004
                     elif v == "collectivists":
-                        addedIntervention += 0.01
+                        addedIntervention += 0.004
                     elif v == "simplicity":
                         addedHostility -= 0.01
                         addedIntervention -= 0.01
                     else:
-                        addedHostility -= 0.004
-                        addedIntervention += 0.004
+                        addedHostility -= 0.001
+                        addedIntervention += 0.001
                 else:
-                    addedHostility += 0.002
-                    addedIntervention -= 0.002
+                    addedHostility += 0.001
+                    addedIntervention -= 0.001
+        #
+        # Change our opinion of them depending on their opinion of us
+        if "alliance" in otherOpinion.activeActions:
+            addedHostility -= 0.01
+        if "aid" in otherOpinion.activeActions:
+            addedHostility -= 0.005
+            addedIntervention += 0.005
+        if "war" in otherOpinion.activeActions:
+            addedHostility += 0.05
+            addedIntervention += 0.03
+        if "closed borders" in otherOpinion.activeActions:
+            addedHostility += 0.01
+            addedIntervention -= 0.005
+        if "trade embargoes" in otherOpinion.activeActions:
+            addedHostility += 0.01
+            addedIntervention -= 0.005
+        if "trade agreements" in otherOpinion.activeActions:
+            addedHostility -= 0.005
+            addedIntervention += 0.005
+        if "non aggression pact" in otherOpinion.activeActions:
+            addedHostility -= 0.005
+        #
+        # Update opinion values
         self.addStatus([addedHostility,0,addedIntervention])
         if self.culture.strength < self.other.strength:
             self.status[1] = -(1-(1/(self.other.strength/self.culture.strength)))
@@ -2246,7 +2312,30 @@ class Opinion:
         for action in actions.keys():
             if abs(distance3d(self.status,actions[action])) < abs(actions[action][3]):
                 self.activeActions.append(action)
-        return 1
+        #
+        # Determine if we want to build a road to them
+        road_increment = 60
+        if "trade agreements" in self.activeActions:
+            if (("aid" in otherOpinion.activeActions or "trade agreements" in otherOpinion.activeActions 
+                or "alliance" in otherOpinion.activeActions)
+                and "closed borders" not in otherOpinion.activeActions and "trade embargoes" not in otherOpinion.activeActions
+                and "war" not in otherOpinion.activeActions):
+                self.culture.tradeAgreements[self.other.name] = True
+                self.other.tradeAgreements[self.culture.name] = True
+                self.roads += road_increment
+                closestCities = self.culture.closestCities(self.other)
+                if closestCities[1] not in closestCities[0].linkedRoads and closestCities[0] not in closestCities[1].linkedRoads:
+                    if closestCities[0].distanceToCity(closestCities[1]) < self.roads:
+                        closestCities[0].linkedRoads.append(closestCities[1])
+                        bcount = random.randint(19,23)
+                        builders = Population(c=closestCities[0].culture,t="builders",a=random.randint(20,32),p=bcount,kind="group",node=closestCities[0].node,prf="roadbuilder")
+                        builders.setPath(closestCities[1].node)
+                        emigrants = bcount
+                        closestCities[0].population = max(closestCities[0].population-emigrants,1)
+        if "trade agreements" not in self.activeActions and "trade agreements" not in otherOpinion.activeActions:
+            self.roads = max(self.roads-road_increment,0)
+            self.culture.tradeAgreements[self.other.name] = False
+            self.other.tradeAgreements[self.culture.name] = False
     def opinionNotes(self):
         if self.knowledge == 0:
             return "The " + self.culture.name + " do not know about the " + self.other.name
@@ -2270,7 +2359,7 @@ class Population:
         self.number = p
         self.profession = prf
         self.kind = kind
-        self.speed = 1.0
+        self.speed = 1
         self.importance = math.floor((random.random()**2)*23)
         self.magic = []
         self.birthEvent = None
@@ -2281,8 +2370,9 @@ class Population:
             lst = [p.importance for p in self.parents]
             self.importance = self.importance + (0.2*(sum(lst)/len(lst)))
         self.baseImportance = self.importance
+        self.talent = random.random()
         self.measure = "tall"
-        self.measurement = random.uniform(1.45,2)
+        self.measurement = 0
         if (prf == None and (self.kind == "group" or self.kind == "person")):
             self.professions = ["artist","artist","artist",
                                 "philosopher","researcher",
@@ -2338,6 +2428,8 @@ class Population:
         if node != None:
             self.travel(node)
         self.terrain = 2    # 0=land, 1=water, 2=air(both)
+        if self.profession == "roadbuilders":
+            self.terrain = 0
         if self.kind == "beast":
             self.genBeast()
         self.immortal = 0
@@ -2472,10 +2564,11 @@ class Population:
         self.birthEvent = e
         self.importance += 15
         self.baseImportance = self.importance
+        self.talent = 1
         if random.random() < 0.36:
             newMagic = Magic(self,n=True)
-    def setPath(self,n):
-        self.path = Path(self.location,n)
+    def setPath(self,n,landy=True):
+        self.path = Path(self.location,n,land=landy)
     def meander(self):
         if random.random() > 0.5:
             return -1
@@ -2494,14 +2587,18 @@ class Population:
         if self.path == None:
             return -1
         nextNode = self.path.nextNode(self.location)
+        if nextNode == None:
+            self.path = None
+            return -1
         if self.profession == "roadbuilder":
             self.location.linkRoads(nextNode)
         self.travel(nextNode)
-        if nextNode == self.path.target and self.profession == "roadbuilder":
-            if nextNode.city != None:
-                nextNode.city.population += self.number
+        if nextNode == self.path.target:
             self.path = None
-            self.erase()
+            if self.profession == "roadbuilder":
+                if nextNode.city != None:
+                    nextNode.city.population += self.number
+                self.erase()
     def travel(self,n):
         if self.location != None and self in self.location.entities:
             self.location.entities.remove(self)
@@ -2539,22 +2636,29 @@ class Population:
             self.power[0] = math.floor(self.power[0])
             self.power[1] = math.floor(self.power[1])
         if self.path != None:
+            baseSpeed = self.speed
+            if self.path.nextNode(self.location) in self.location.roads:
+                baseSpeed += 0.5
+            numSteps = math.floor(baseSpeed)
+            if random.random() < baseSpeed-numSteps:
+                numSteps += 1
             if self.profession == "roadbuilder":
-                self.speed = 1*math.sqrt(self.culture.tech["transportation"])
+                self.speed = 1
+                numSteps = 1
                 if self.path.hasWater() == 1:
                     self.erase()
+                    if self.location.city != None:
+                        self.location.city.population += self.number
                     return -1
-            numSteps = math.floor(self.speed)
-            if random.random() < self.speed-numSteps:
-                numSteps += 1
-            if self.path.nextNode(self.location) in self.location.roads:
-                numSteps += 1
             for eachStep in range(numSteps):
                 self.step()
         elif self.kind == "beast":
             self.meander()
         elif self.profession == "explorer" and self.age > 14:
-            self.meander()
+            if self.culture.leader != self:
+                self.setPath(random.choice(self.culture.myMap.atlas),landy=False)
+            elif self.location != self.culture.origin:
+                self.setPath(self.culture.origin,landy=False)
     def kill(self,n):
         n = math.floor(n)
         self.number = clamp(self.number-n,0,self.number)
@@ -2610,6 +2714,16 @@ class Population:
             return filename
         else:
             return self.face
+    def getHeight(self):
+        if self.face == None:
+            hh = 1.5
+        elif self.dead == 1 and self.deathAge < 17:
+            hh = self.face.height*((self.deathAge+10)/27)
+        elif self.age < 17:
+            hh = self.face.height*((self.age+10)/27)
+        else:
+            hh = self.face.height
+        return round(hh,2)
     def offspring(self):
         if self.kind != "person":
             return -1
@@ -2621,7 +2735,7 @@ class Population:
             return -1
         if self.location.city == None:
             return -1
-        primeAge = 40
+        primeAge = 37
         ageGap = abs(self.age-primeAge)
         fertility = (2**-(0.5*((ageGap/7)**2))) # From 0 to 1
         if self.culture.society in ["Hegemony","Empire","Imperium","Monarchy"]:
@@ -2644,9 +2758,9 @@ class Population:
             return -1
         if self.profession == "roadbuilder":
             return -1
-        if self.culture.leader == self and random.random() > 0.25:
+        if self.culture.leader == self and random.random() > 0.35:
             return -1
-        if self.number > 1 and random.random() > 0.35:
+        if self.number > 1 and random.random() > 0.3:
             return -1
         if self.age < 15:
             return -1
@@ -2671,7 +2785,7 @@ class Population:
         if random.random() > 0.35:
             t = random.choice(["event","event","event","event","pop","pop","item","item"])
         # ONLY have subjects of works be from cultures known to the creator.
-        # Todo: use the Opinions when they work.
+        # Todo: use the Opinions to mostly only select from friendly cultures.
         knownCultures = []
         knownCultures = knownCultures + [x.other for x in self.culture.cultureOpinions.values() if x.knowledge >= 1]
         knownCultures = knownCultures + [self.culture, self.culture, self.culture, self.culture, self.culture]
@@ -2711,6 +2825,7 @@ class Population:
             else:
                 fff = random.choice(self.culture.myMap.spheres)
         w = Item(k=kind,c=self.culture,f=fff,s=subj,i=self.importance*random.uniform(0.3,1.8),cr=self)
+        self.talent = clamp(self.talent*1.01,0,1)
         if w.importance >= 10:
             self.culture.tech[self.field] *= ((random.uniform(0.001,0.01))+1)
         self.works.append(w)
@@ -2769,7 +2884,8 @@ class Population:
                 s += "s"
             s += " from the " + self.culture.name + " culture"
         if self.kind == "person":
-            s += "person from the "
+            s += str(self.getHeight()) + "-meter-" + self.measure
+            s += " person from the "
             s += self.culture.name + " culture"
         if self.kind == "group":
             s += "people from the "
@@ -2921,10 +3037,12 @@ class Population:
     def drawPerson(self,drawer,x,y):
         c = self.culture.bannerColor
         out = (0,0,0)
-        pts = [(x-3,y-5),(x+3,y+1)]
+        pts = [(x-2,y-3),(x+2,y+1)]
         drawer.ellipse(pts,outline=out,fill=c)
         pts = [(x-3,y+2),(x+3,y+5)]
         drawer.rectangle(pts,outline=out,fill=c)
+        pts = [(x-1,y-2),(x+1,y),(x-1,y),(x+1,y-2)]
+        drawer.point(pts,fill=c)
     def drawSelf(self,drawer):
         if self.location == None:
             return -1
@@ -3158,6 +3276,19 @@ class Language:
             self.properNouns.append(n)
         return n
 
+class Star:
+    def __init__(self,a,d):
+        self.rightAscension = a
+        self.declination = d
+        # distance between 1 and 20 pc
+        self.distance = random.uniform(1,20)
+        self.temperature = math.floor(random.uniform(0,120))
+        self.saturation = math.floor(clamp(0.03*((self.temperature-65)**2),0,255))
+        # magnitude at 10 parsec between 8 and -6
+        self.absoluteMagnitude = random.uniform(-6,8)-(self.temperature/120)
+        self.apparentMagnitude = self.absoluteMagnitude+5*(math.log(self.distance,10)-1)
+        self.brightness = math.floor(clamp(255-(14*abs(-9-self.apparentMagnitude)),0,255))
+
 class Map:
     def __init__(self,aAtlas,numNodes,mapDimX,mapDimY):
         self.atlas = aAtlas
@@ -3177,6 +3308,7 @@ class Map:
         self.seasonStrength = 0.041
         self.setNorth()
         self.biomeColors()
+        self.genStars()
         self.displayNo = None
         self.infoGui = None
         self.extraGui = None
@@ -3495,7 +3627,7 @@ class Map:
         if shape != "volcanic":
             self.addMountains()
             self.addHills()
-        self.smooth(3)
+        self.smooth(5)
     def addRandomShape(self):
         shp = random.choice(["highlands","plain","volcanic","shore","archipelago","island"])
         self.addShape(shp)
@@ -3574,6 +3706,16 @@ class Map:
         for p in self.atlas:
             p.herbivores = clamp((p.vegetation*random.uniform(0.8,1.25))**1.5,0,1)
             p.carnivores = clamp(((p.herbivores*1.2)**1.5),0,1)
+    def genStars(self):
+        self.stars = []
+        numStars = 1000
+        for e in range(numStars):
+            u1 = random.random()
+            u2 = random.random()
+            latitude = math.acos((2*u1)-1)-(math.pi/2)
+            longitude = 2*u2*math.pi
+            newStar = Star(longitude,latitude)
+            self.stars.append(newStar)
     def biomeColors(self):
         bColors = {}
         bColors["desert"] = (16,64,142)
@@ -4078,17 +4220,22 @@ class Map:
         graphDraw = ImageDraw.Draw(visualAtlas)
         if self.viewmode == 0:
             rds = []
+            structures = []
             for tri in self.triangles:
                 tri.drawReal(graphDraw,self.sealevel)
             for n in self.atlas:
                 n.drawReal(graphDraw,self.sealevel)
                 if len(n.roads) > 0:
                     rds.append(n)
+                if n.structure() != None:
+                    structures.append(n)
             for l in self.landmasses:
                 for r in l.rivers:
                     r.drawRiver(graphDraw,self.xDim)
             for n in rds:
                 n.drawRoads(graphDraw,self.roadCol)
+            for n in structures:
+                n.drawSelf(graphDraw)
             for c in self.cities:
                 c.drawSelf(graphDraw)
         elif self.viewmode == 1:
@@ -4248,11 +4395,6 @@ class Map:
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
-        self.popString = StringVar()
-        self.popString.set(p.popNotes())
-        pdsc = Label(self.infoGui,textvariable=self.popString)
-        pdsc.pack(anchor=W,side=RIGHT)
-        self.displayCulture = p.culture
         if p.kind == "person":
             nn = p.generateFace(0)
             photo = Image.open(nn)
@@ -4261,6 +4403,11 @@ class Map:
             self.faceLbl.config(borderwidth=32)
             self.faceLbl.photo = photo
             self.faceLbl.pack()
+        self.popString = StringVar()
+        self.popString.set(p.popNotes())
+        pdsc = Label(self.infoGui,textvariable=self.popString)
+        pdsc.pack(anchor=W,side=RIGHT)
+        self.displayCulture = p.culture
         if p.kind == "city":
             return;
         if p.kind != "beast":
@@ -4472,6 +4619,17 @@ class Map:
         b2.pack(anchor=S,side=BOTTOM,expand=YES,fill=BOTH)
         c1 = "SteelBlue2"
         b2.config(bg=c1,activebackground=c1,activeforeground=c1)
+    def celestialInfo(self):
+        if self.infoGui != None:
+            self.infoGui.destroy()
+        self.infoGui = Toplevel()
+        self.drawCelestial()
+        photo = Image.open(self.celestialFilename)
+        self.townImg = ImageTk.PhotoImage(photo)
+        self.townLbl = Label(self.infoGui,image=self.townImg)
+        self.townLbl.config(borderwidth=2)
+        self.townLbl.photo = photo
+        self.townLbl.pack()
     def entitiesInfo(self):
         if self.displayNo == None:
             return -1
@@ -4504,6 +4662,44 @@ class Map:
         else:
             self.drawpops += 1
         self.redraw()
+    def drawCelestial(self):
+        skyDimX = math.floor(mapDimX*1.5)
+        skyDimY = math.floor(skyDimX/2)
+        visualSky = Image.new("HSV",(skyDimX,skyDimY),(0,0,80))
+        graphDraw = ImageDraw.Draw(visualSky)
+        graphDraw.ellipse([(0,0),(skyDimX,skyDimY)],fill=(0,0,0))
+        for star in self.stars:
+            mollweideY = (star.declination+(math.pi/2))*(skyDimY/(math.pi))
+            angularFactor = math.sqrt(1-((star.declination/(math.pi/2))**2))
+            mollweideX = (((star.rightAscension-(math.pi))*angularFactor)*(skyDimX/(math.pi*2)))+(skyDimX/2)
+            pts = [(mollweideX,mollweideY)]
+            starCol = (star.temperature,star.saturation,star.brightness)
+            graphDraw.point(pts,fill=starCol)
+            if star.apparentMagnitude < -1 and star.apparentMagnitude > -5:
+                starCol2 = (star.temperature,star.saturation,math.floor(star.brightness/3))
+                pts = [(mollweideX-1,mollweideY),(mollweideX+1,mollweideY),(mollweideX,mollweideY-1),(mollweideX,mollweideY+1)]
+                graphDraw.point(pts,fill=starCol2)
+            if star.apparentMagnitude <= -5 and star.apparentMagnitude > -8:
+                starCol2 = (star.temperature,star.saturation,math.floor(star.brightness/2))
+                pts = [(mollweideX-1,mollweideY),(mollweideX+1,mollweideY),(mollweideX,mollweideY-1),(mollweideX,mollweideY+1)]
+                graphDraw.point(pts,fill=starCol2)
+                starCol3 = (star.temperature,star.saturation,math.floor(star.brightness/4))
+                pts = [(mollweideX-1,mollweideY-1),(mollweideX+1,mollweideY+1),(mollweideX+1,mollweideY-1),(mollweideX-1,mollweideY+1)]
+                graphDraw.point(pts,fill=starCol3)
+            if star.apparentMagnitude <= -8:
+                starCol2 = (star.temperature,star.saturation,math.floor(star.brightness/2))
+                pts = [(mollweideX-1,mollweideY),(mollweideX+1,mollweideY),(mollweideX,mollweideY-1),(mollweideX,mollweideY+1),
+                       (mollweideX-1,mollweideY-1),(mollweideX+1,mollweideY+1),(mollweideX+1,mollweideY-1),(mollweideX-1,mollweideY+1)]
+                graphDraw.point(pts,fill=starCol2)
+                starCol3 = (star.temperature,star.saturation,math.floor(star.brightness/4))
+                pts = [(mollweideX-2,mollweideY-1),(mollweideX-2,mollweideY),(mollweideX-2,mollweideY+1),
+                       (mollweideX+2,mollweideY-1),(mollweideX+2,mollweideY),(mollweideX+2,mollweideY+1),
+                       (mollweideX-1,mollweideY+2),(mollweideX,mollweideY+2),(mollweideX+1,mollweideY+2),
+                       (mollweideX-1,mollweideY-2),(mollweideX,mollweideY-2),(mollweideX+1,mollweideY-2),]
+                graphDraw.point(pts,fill=starCol3)
+        visualSky = visualSky.convert("RGB")
+        self.celestialFilename = "./generated/map_stars_" + self.cultures[0].language.genName() + ".gif"
+        visualSky.save(self.celestialFilename,"GIF")
     def drawReal(self,gui=None):
         visualAtlas = Image.new("HSV",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -4564,6 +4760,10 @@ class Map:
             b4.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "salmon4"
             b4.config(bg=c1,activebackground=c1,activeforeground=c1)
+            b7 = Button(gui,text="Celestial Sphere",command=self.celestialInfo)
+            b7.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "RoyalBlue3"
+            b7.config(bg=c1,activebackground=c1,activeforeground=c1)
             self.redraw()
             for i in range(1):
                 self.nextTurn()

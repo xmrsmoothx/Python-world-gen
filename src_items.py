@@ -23,6 +23,9 @@ class Item:
         self.creator = cr
         self.subkind = None
         self.decoration = None
+        self.quality = random.random()
+        self.quality = clamp((self.quality+self.creator.talent)/2,0.05,1)
+        self.importance = self.importance*(1+(self.quality/2))
         if self.kind == "piece":
             self.subkind = synonym("piece")
         subname = ""
@@ -172,6 +175,14 @@ class Item:
                 s += "The subject of the " + q + " is the " + self.subject.culture.name + " " + self.subject.nameFull() + ".\n"
             except AttributeError: 
                 s += "The subject of the " + q + " is the " + self.subject.nameFull() + ".\n"
+        s += "The "
+        if (self.kind in ["story","book"] or self.subkind in ["concerto","song","sonnet","ballad"]):
+            s += "writing "
+        elif self.kind in ["piece"]:
+            s += "artistry "
+        else:
+            s += "craftsmanship "
+        s += "is " + talentTier(self.quality) + ".\n"
         s += "It is generally considered "
         if self.importance < 13:
             s += "unimportant"

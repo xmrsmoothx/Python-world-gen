@@ -14,6 +14,9 @@ class Magic:
     def __init__(self,c,n=False):
         self.tt = "magic"
         self.natural = n
+        self.creator = c
+        self.creator.magic.append(self)
+        self.culture = self.creator.culture
         # Choose a type of magic spell. This is (mostly?) cosmetic.
         kinds = ["incantation","meditation","spell","prayer","invocation","channeling","concoction","ritual","song","divination"]
         naturalKinds = ["breath","song","roar","excretion","stare"]
@@ -37,11 +40,9 @@ class Magic:
         or (self.natural == True and self.target not in naturalTargets)):
             self.effect = random.choice(list(effects.keys()))
             self.target = random.choice(list(targets.keys()))
-        self.strength = clamp(random.random()**2,0.05,1)
+        self.strength = random.random()**2
+        self.strength = clamp((self.strength+self.creator.talent)/2,0.05,1)
         self.magnitude = effects[self.effect]*targets[self.target]
-        self.creator = c
-        self.creator.magic.append(self)
-        self.culture = self.creator.culture
         prefixes = {"curse":["doom","curse","hate","hex","spite"],
                  "bless":["holy","sacrosanct","consecrating","purifying"],
                  "destroy":["deadly","death","inferno","fire","skull","mortal","horror","final","nightmare","doom","agony"],
