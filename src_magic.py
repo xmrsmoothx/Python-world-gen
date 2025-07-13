@@ -18,9 +18,9 @@ class Magic:
         self.creator.magic.append(self)
         self.culture = self.creator.culture
         # Choose a type of magic spell. This is (mostly?) cosmetic.
-        kinds = ["incantation","meditation","spell","prayer","invocation","channeling","concoction","ritual","song","divination"]
-        naturalKinds = ["breath","song","roar","excretion","stare"]
-        # Choose one effect to do to the target; greater magnitudes are harder/less likely to be cast and generated
+        kinds = ["incantation","meditation","spell","prayer","invocation","channeling","concoction","ritual","song","divination","sorcery"]
+        naturalKinds = ["breath","song","roar","excretion","stare","bite"]
+        # Choose one effect to do to the target; greater magnitudes are harder and less likely to be cast and generated
         effects = {"curse":-1,"bless":1,"destroy":-2.5,"create":3,"transmute":-0.4,"transport":-0.4,
                    "harm":-0.75,"heal":0.75,"resurrect":3,"burn":-1,"freeze":-1,"poison":-1.5}
         # Choose a target. Greater magnitudes are harder/less likely to be cast and generated
@@ -36,12 +36,14 @@ class Magic:
             self.kind = random.choice(naturalKinds)
         self.effect = random.choice(list(effects.keys()))
         self.target = random.choice(list(targets.keys()))
-        while (self.effect + " " + self.target in impossibleSpells or abs(effects[self.effect]*targets[self.target]) > random.uniform(0,120)
+        while (self.effect + " " + self.target in impossibleSpells or abs(effects[self.effect]*targets[self.target]) > random.uniform(0,90)
         or (self.natural == True and self.target not in naturalTargets)):
             self.effect = random.choice(list(effects.keys()))
             self.target = random.choice(list(targets.keys()))
         self.strength = random.random()**2
-        self.strength = clamp((self.strength+self.creator.talent)/2,0.05,1)
+        if self.natural == False:
+            self.strength = self.strength*math.sqrt(self.culture.tech["magic"])
+        self.strength = clamp((self.strength+self.creator.skill)/2,0.05,1)
         self.magnitude = effects[self.effect]*targets[self.target]
         prefixes = {"curse":["doom","curse","hate","hex","spite"],
                  "bless":["holy","sacrosanct","consecrating","purifying"],
@@ -52,7 +54,7 @@ class Magic:
                  "harm":["fire","vitriol","brimstone","meteor","pain","blood"],
                  "heal":["blessed","purification","mending","healing","light"],
                  "resurrect":["necromantic","soul","light","blessed","corpse","grave"],
-                 "burn":["fire","brimstone","searing","combustion"],
+                 "burn":["fire","brimstone","searing","combustion","inferno"],
                  "freeze":["ice","cold","arctic","biting","frost"],
                  "poison":["poison","toxic","noxious","caustic"]}
         suffixes = {"curse":["doom","curse","hate","hex","spite"],
@@ -66,7 +68,7 @@ class Magic:
                  "resurrect":["necromancy","revival","resurrection","unearthing","resuscitation","light"],
                  "burn":["torch","inferno","fire","brimstone","blast","pyre"],
                  "freeze":["chill","frost","icicle","blizzard","bite"],
-                 "poison":["toxin","poison","infection","decay"]}
+                 "poison":["toxin","poison","infection","decay","miasma"]}
         s = self.culture.language.genName()
         roll = random.random()
         if roll < 0.25:
@@ -81,6 +83,40 @@ class Magic:
         if self.natural == True:
             self.name = string.capwords(self.creator.justName() + "'s " + self.kind)
         self.culture.magic.append(self)
+    def cast(self,subject,caster):
+        amount = self.strength
+        if self.target == "item":
+            self.apply(subject,amount,caster)
+        if self.target == "person":
+            self.apply(subject,amount,caster)
+        if self.target == "group":
+            self.apply(subject,amount,caster)
+        if self.target == "bloodline":
+            self.apply(subject,amount,caster)
+            for k in subject.getDescendants():
+                self.apply(k,amount,caster)
+        if self.target == "location":
+            self.apply(subject,amount,caster)
+        if self.target == "city":
+            self.apply(subject.node,amount,caster)
+        if self.target == "region":
+            for n in subject.nodes:
+                self.apply(n,amount,caster)
+        if self.target == "nation":
+            for c in subject.cities:
+                rr = c.node.resourceRegion
+                for n in rr.nodes:
+                    self.apply(n,amount,caster)
+    def apply(self,subject,amount,caster):
+        if subject.tt == "item":
+            if self.effect == "destroy":
+                subject.damage(1,[caster])
+        if subject.tt == "pop":
+            if self.effect == "destroy":
+                subject.kill(1,[caster])
+        if subject.tt == "node":
+            if self.effect == "destroy":
+                a = 1
     def justName(self):
         return self.name
     def nameFull(self):

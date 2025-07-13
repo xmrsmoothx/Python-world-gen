@@ -57,7 +57,7 @@ class Face:
         self.partleft = ((self.hairlength/self.xDim)*2*60)*random.uniform(0.7,1.3)
         self.partright = ((self.hairlength/self.xDim)*2*60)*random.uniform(0.7,1.3)
         self.earsize = self.earsize*random.uniform(0.9,1.1)
-        self.height = self.height*random.uniform(0.9,1.1)
+        self.height = self.height*random.uniform(0.88,1.1)
     def clampVals(self):
         self.headheight = clamp(self.headheight,self.xDim*0.7,self.xDim*0.75)
         self.headwidth = clamp(self.headwidth,self.xDim*0.5,self.xDim*0.65)

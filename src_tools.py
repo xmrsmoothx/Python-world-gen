@@ -9,6 +9,14 @@ import random
 import math
 import numpy as np
 
+def lengthDirX(length, angle):
+  radian_angle = math.radians(angle)
+  return length * math.cos(radian_angle)
+
+def lengthDirY(length, angle):
+  radian_angle = math.radians(angle)
+  return length * math.sin(radian_angle)
+
 def getPrime(num):
     primesList = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103]
     num = num % len(primesList)
@@ -18,9 +26,55 @@ def nearestHundred(largeNum):
     return round(largeNum/100)*100
 
 class Tools:
-    streetColor = (16,120,104)
-    waterColor = (142,96,64)
-    buildingColor = (0,0,48)
+    streetColor = (117, 96, 66)
+    waterColor = (48, 76, 94)
+    buildingColor = (40, 40, 40)
+    farmColor = (156, 112, 17)
+    vowels = ["a","e","i","o","u"]
+    plotXDim = 600
+    plotYDim = 400
+    plotBackCol = (0,0,0)
+    plotCol = (240,20,20)
+    plotSecondCol = (0,240,0)
+    technologies = {}
+    technologies["weaponry"] = 1
+    technologies["defense"] = 1
+    technologies["agriculture"] = 1
+    technologies["production"] = 1
+    technologies["metallurgy"] = 1
+    technologies["medicine"] = 1
+    technologies["government"] = 1
+    technologies["art"] = 1
+    technologies["philosophy"] = 1
+    technologies["research"] = 1
+    technologies["transportation"] = 1
+    technologies["magic"] = 1
+
+class CombatTools:
+    armyTypes = ["assault infantry","guard infantry","siege","artillery","ranged infantry","mechanized","cavalry","fleet","beast"]
+    standardArmyTypes = ["assault infantry","siege","artillery","ranged infantry","cavalry"]
+    rps = {"assault infantry":["artillery","siege"],
+                    "guard infantry":["assault infantry","ranged infantry","cavalry"],
+                    "siege":["guard infantry","artillery"],
+                    "artillery":["guard infantry","assault infantry","ranged infantry","artillery","mechanized"],
+                    "ranged infantry":["assault infantry","cavalry"],
+                    "mechanized":["siege","cavalry","artillery","assault infantry"],
+                    "cavalry":["assault infantry","artillery","siege","cavalry"],
+                    }
+    # How much more offensive power armies have against army types they're strong against
+    rpsMultiplier = 2
+    # First value is offensive modifier; second value is defensive modifier; third value is unit weight modifier
+    unitBalance = {"assault infantry":[1,1,1.2],
+                            "guard infantry":[1,1.5,1.2],
+                            "siege":[1.25,0.75,2.5],
+                            "artillery":[2,0.5,2],
+                            "ranged infantry":[1.25,0.75,1.4],
+                            "mechanized":[1.5,1.5,3],
+                            "cavalry":[1.25,1,1.8],
+                            "fleet":[10,10,3]}
+    baseMilitarization = 0.08
+    startingSkill = 0.4
+    commandRanks = ["General","Colonel","Colonel","Commander","Commander","Commander","Captain","Captain","Captain","Captain","Captain","Captain"]
 
 def clamp(x,minimum,maximum):
     if x < minimum:
@@ -53,32 +107,32 @@ def techTier(lv):
     return clamp(((2**((steepness*lv)-2))/((2**((steepness*lv)-2))+3))*(5.8*(1.002**lv))-0.4,0,8)
     
 
-def talentTier(talent):
-    tier = math.floor(talent*10)
+def skillTier(skill):
+    tier = math.floor(skill*10)
     tiersList = ["poor","poor","fair","fair","fair","skillful","skillful","skillful","masterful","legendary","legendary"]
     return tiersList[tier]
 
 def synonym(x,seed=0,exclusive=0):
     s = {}
-    s["mountain"] = ["mountain","peak","ridge"]
-    s["savanna"] = ["savanna","plain","prairie"]
+    s["mountains"] = ["mountains","peaks","ridges","highlands"]
+    s["savanna"] = ["savanna","plain","prairie","fields"]
     s["shrubland"] = ["shrubland","badlands","bushland"]
     s["forest"] = ["forest","woods","wood","woodland"]
     s["desert"] = ["desert","desert","wastes","barrens"]
     s["tundra"] = ["tundra","steppes","tundras"]
-    s["frost tundra"] = ["frost tundra","arctic","alpines","frozen tundra"]
+    s["frost tundra"] = ["frost tundra","arctic","frozen tundra","ice cap"]
     s["tropical forest"] = ["tropical forest","jungle","bush","rainforest"]
     s["boreal forest"] = ["boreal forest","woods","wood","taiga"]
     s["carnivores"] = ["carnivores","predators","hunters"]
     s["herbivores"] = ["herbivores","livestock","cattle","prey"]
-    s["fear"] = ["fear","terror","dread","anxiety"]
+    s["fear"] = ["fear","terror","dread","anxiety","hatred"]
     s["warriors"] = ["warriors","fighters","soldiers"]
     s["traders"] = ["traders","merchants","sellers","brokers"]
-    s["naturalists"] = ["naturalists","herbalism","gardeners","herbalists","gardening"]
-    s["travelers"] = ["travelers","wanderers","nomads","migrants","itinerants"]
+    s["naturalism"] = ["naturalism","naturalists","herbalism","gardeners","herbalists","gardening","druids"]
+    s["travelers"] = ["travelers","wanderers","nomads","migrants","itinerants","wayfarers"]
     s["sailors"] = ["sailors","mariners","wayfarers","navigation","seafaring"]
     s["swimming"] = ["swimming","sailing","navigating","diving","cruising"]
-    s["agriculture"] = ["agriculture","farming","irrigation","crops","cultivation"]
+    s["agriculture"] = ["agriculture","farming","irrigation","crops","cultivation","harvest"]
     s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
     s["village"] = ["village","hamlet"]
     s["township"] = ["township","settlement"]
@@ -92,48 +146,52 @@ def synonym(x,seed=0,exclusive=0):
     s["death"] = ["death","mortality","murder","the afterlife","killing"]
     s["ice"] = ["ice","snow","frost","cold"]
     s["greed"] = ["greed","wealth","gold","riches","treasure"]
-    s["growth"] = ["growth","sprouting","farming","blooming"]
-    s["sky"] = ["sky","stars","heavens","clouds"]
+    s["growth"] = ["growth","sprouting","farming","bounty","harvest"]
+    s["sky"] = ["sky","stars","heavens","clouds","cosmos"]
     s["superstition"] = ["superstition","religion","faith","theology","paranormal"]
-    s["collectivists"] = ["collectivists","community","cooperation","communism","socialism"]
-    s["worshippers"] = ["worshippers","religion","monks","priests","prayer","mythology"]
-    s["freedom"] = ["freedom","liberation","liberty","anarchism"]
-    s["large"] = ["large","big","sizable","grand","great"]
+    s["collectivism"] = ["collectivism","community","cooperation","communism","socialism"]
+    s["worship"] = ["worship","religion","monks","priests","prayer","mythology"]
+    s["individualism"] = ["individualism","liberation","liberty","anarchism","freedom"]
+    s["large"] = ["large","sizable","grand","great"]
     s["huge"] = ["huge","giant","tremendous","colossal","massive"]
     s["gigantic"] = ["gigantic","titanic","humongous","gargantuan","vast"]
     s["book"] = ["book","record","volume","document","treatise","paper","study","codex","essay","meditations"]
-    s["story"] = ["story","novel","epic","poem","tale","play","legend","chronicle"]
+    s["story"] = ["story","novel","epic","tale","legend","chronicle"]
     s["piece"] = ["painting","woodcut","drawing","sculpture","statue","bust","etching",
-     "tapestry","fresco","mural","concerto","song","sonnet","ballad"]
-    s["weapon"] = ["sword","spear","greatsword","longsword","blade","rapier",
-     "hammer","axe","staff","sceptre","mace","lance","rifle","pistol"]
+     "tapestry","fresco","mural"]
+    s["song"] = ["song","concerto","sonnet","ballad","opera","suite","composition","arrangement","album"]
+    s["play"] = ["play","musical","opera","satire","comedy","tragedy","drama"]
+    s["poem"] = ["poem","sonnet","ballad","epic"]
+    s["weapon"] = ["sword","spear","greatsword","longsword","blade","rapier","crossbow",
+     "hammer","axe","staff","sceptre","mace","lance","rifle","pistol","longbow","shortbow","halberd","pike"]
     s["helmet"] = ["helmet","helm","crown","circlet","coif","headdress","coronet","diadem","sallet","bascinet","burgonet"]
     s["bodice"] = ["bodice","breastplate","hauberk","mail","brigandine","lamellar","platemail","cuirass","coat","vest"]
     s["shield"] = ["shield","buckler","kite shield","tower shield","targe","pavise","roundshield","greatshield","small shield"]
+    s["tool"] = ["tool","hammer","drill","saw","chisel","sextant","wrench","hatchet","axe","cane","brush","shovel","pickaxe"]
     s["paper"] = ["paper","parchment","vellum","slate","papyrus","bamboo","eelskin","rawhide","sandstone"]
-    s["wood"] = ["wood","oak","maple","mahogany","pine","birch","hickory","fir"]
+    s["wood"] = ["wood","oak","maple","mahogany","pine","birch","hickory","fir","ash","teak","olive","cork","balsa","pecan"]
     s["stone"] = ["stone","granite","basalt","obsidian","limestone","sandstone","slate","marble","gneiss"]
-    s["metal"] = ["metal","steel","iron","bronze","brass","copper","silver","gold","titanium","aluminium","tin","nickel","electrum"]
-    s["paint"] = ["paint","oil","acrylic","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
-    s["weaponry"] = ["weaponry","combat","artillery","blades","war","battle","assault"]
-    s["defense"] = ["defense","combat","armor","war","battle","siege","fortification"]
+    s["metal"] = ["metal","steel","iron","bronze","brass","copper","silver","gold","titanium","aluminium","tin","nickel","electrum","platinum"]
+    s["paint"] = ["paint","oil","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
+    s["weaponry"] = ["weaponry","combat","blades","war","battle","assault","killing"]
+    s["defense"] = ["defense","combat","armor","war","battle","fortification"]
     s["production"] = ["production","industry","factories","craftsmanship"]
     s["mining"] = ["mining","minerals","mountains","metals","forging","excavation"]
     s["metallurgy"] = ["minerals","mountains","metals","forging","smithing","smelting"]
     s["government"] = ["government","bureaucracy","administration","authority","states","the state"]
     s["transportation"] = ["transportation","sailing","travel","rail","roads","infrastructure","roadbuilding"]
     s["research"] = ["research","science","experiments","physics","mathematics","language"]
-    s["equality"] = ["equality","sociology","progressivism","revolution","heirarchy","anarchy"]
     s["art"] = ["art","painting","sculpting","singing","music","beauty","drawing"]
-    s["philosophy"] = ["philosophy","metaphysics","thought","ontology","epistemology","existentialism"]
+    s["philosophy"] = ["philosophy","metaphysics","thought","ontology","epistemology","existentialism","knowledge"]
     s["medicine"] = ["medicine","anatomy","pharmaceuticals","surgery","illness","disease","pathogens","health"]
     s["artillery"] = ["artillery","howitzers","catapults","trebuchets","ballistas","cannons"]
     s["assault infantry"] = ["assault infantry","warriors","troopers","soldiers","infantrymen","fighters","brigade"]
     s["mechanized"] = ["mechanized","tanks","armored","engineers"]
     s["cavalry"] = ["cavalry","horseback riders","mounted","lancers","cuirassiers","horseback brigade","dragoons","hussars"]
     s["guard infantry"] = ["guard infantry","garrison","sentinels","defensive brigade","guardsmen","reserve"]
-    s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carbiners"]
+    s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carabiniers"]
     s["siege"] = ["siege","siege towers","battering rams","demolitionists","blockades","sappers"]
+    s["fleet"] = ["fleet","wing","detachment","flotilla","navy"]
     s["about"] = ["about","dealing with","related to","explaining","questioning",
      "investigating","on","concerning","relating to","challenging","exploring","pondering"]
     s["water"] = ["water","moisture","rain","rainfall","irrigation","fluids","humidity"]
@@ -146,6 +204,11 @@ def synonym(x,seed=0,exclusive=0):
     s["office"] = ["office","statehouse","seat","headquarters","chamber","courthouse"]
     s["longhouse"] = ["longhouse","hall","tent","meeting hall","court","fort","stronghold","grand hall"]
     s["detail"] = ["detail","engraving","filigree","embossing","brushwork","chiseling","paint"]
+    s["simplicity"] = ["simplicity","asceticism","minimalism","detachment"]
+    s["craftsmen"] = ["craftsmen","artisans","craft","work","creation","building","forging"]
+    s["builders"] = ["builders","construction","manufacturing","craftsmen","fabrication"]
+    s["ruins"] = ["ruins","wreckage"]
+    s["temperature"] = ["temperature","heat","sunlight","warmth","thermodynamics"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)

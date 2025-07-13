@@ -187,6 +187,14 @@ class Block:
         vts.append(vts[0])
         dCol = Tools.streetColor
         drawer.line(vts,dCol,3)
+    def drawBuilding(self,drawer):
+        self.drawRoads(drawer)
+        dCol = self.col
+        if len(self.verts) > 1:
+            vts = [(p.x,p.y) for p in self.verts]
+            dCol = Tools.streetColor
+            bCol = Tools.buildingColor
+            drawer.polygon(vts,bCol,dCol)
     def drawSelf(self,drawer):
         dCol = self.col
         if len(self.verts) > 1:
@@ -211,6 +219,7 @@ class Town:
         self.waterColor = Tools.waterColor
         self.x = self.xDim/2
         self.y = self.yDim/2
+        self.roadRadius = 3
         if self.node.city != None:
             self.population = self.node.city.population
             self.wateryNeighbors = [u for u in self.node.neighbors if u.watery() == 1]
@@ -278,9 +287,11 @@ class Town:
             if n.bodyWater != None:
                 s.type = "water"
                 s.drawCol = self.waterColor
-            else:
+            elif self.node.elevation > n.elevation:
                 s.drawCol = n.myMap.biomeColors[n.biome]
                 #s.drawCol = colAvg(n.myMap.biomeColors[n.biome],self.landColor)
+            else:
+                s.drawCol = self.landColor
             if len(n.roads) > 0:
                 s.road = True
             s.node = n
@@ -309,7 +320,7 @@ class Town:
         if self.node.watery() == 1:
             for f in self.blocks:
                 f.col = self.waterColor
-        if self.node.city != None:
+        else:
             if self.nearestBlock(self.x,self.y).col == self.waterColor:
                 newCenter = self.nearestSolidBlock(self.x,self.y)
                 newCenter.centroid()
@@ -374,27 +385,89 @@ class Town:
                     c1 = math.floor(c1/pp)
                     c2 = math.floor(c2/pp)
                     i.col = (c0,c1,c2)
+    def addBuilding(self,drawer,roadCenter):
+        chosenX = math.floor(random.uniform(self.xDim/3,self.xDim/1.5))
+        chosenY = math.floor(random.uniform(self.yDim/3,self.yDim/1.5))
+        chosenBlock = self.nearestSolidBlock(chosenX,chosenY)
+        if len(roadCenter) > 0:
+            dCol = Tools.streetColor
+            drawer.line([roadCenter,(chosenBlock.x,chosenBlock.y)],dCol,math.floor(self.roadRadius*2))
+        chosenBlock.drawBuilding(drawer)
+    def addFarm(self,drawer,roadCenter):
+        polygonSides = random.choice([3,4,4,4,5,5,6])
+        polygonRadius = math.floor(random.uniform(self.xDim/6,self.xDim/4))
+        polygonAngle = random.randint(0,359);
+        #polygonLocation = random.choice([(self.xDim/3,self.yDim/2),(self.xDim/1.5,self.yDim/2),(self.xDim/2,self.yDim/3),(self.xDim/2,self.yDim/1.5)])
+        polygonCorners = []
+        for p in range(polygonSides):
+            lengthDeviation = random.uniform(0.65,1.2)
+            corner_x = self.x + lengthDirX(polygonRadius*lengthDeviation,polygonAngle+((360/polygonSides)*p))
+            corner_y = self.y + lengthDirY(polygonRadius*lengthDeviation,polygonAngle+((360/polygonSides)*p))
+            polygonCorners.append((math.floor(corner_x),math.floor(corner_y)))
+        chosenCorner = polygonCorners[0]
+        chosenBlock = self.nearestSolidBlock(chosenCorner[0],chosenCorner[1])
+        if len(roadCenter) > 0:
+            dCol = Tools.streetColor
+            drawer.line([roadCenter,(chosenBlock.x,chosenBlock.y)],dCol,math.floor(self.roadRadius*2))
+        dCol = Tools.streetColor
+        bCol = Tools.farmColor
+        drawer.polygon(polygonCorners,bCol,dCol)
+        polygonCorners.append(polygonCorners[0])
+        drawer.line(polygonCorners,dCol,3)
+        chosenBlock.drawBuilding(drawer)
+    def addFort(self,drawer):
+        polygonSides = random.choice([3,4,4,4,4,5,5,5,6,6,7,8])
+        polygonRadius = math.floor(random.uniform(self.xDim/15,self.xDim/11))
+        polygonAngle = random.randint(0,359);
+        #polygonLocation = random.choice([(self.xDim/3,self.yDim/2),(self.xDim/1.5,self.yDim/2),(self.xDim/2,self.yDim/3),(self.xDim/2,self.yDim/1.5)])
+        polygonCorners = []
+        for p in range(polygonSides):
+            corner_x = self.x + lengthDirX(polygonRadius,polygonAngle+((360/polygonSides)*p))
+            corner_y = self.y + lengthDirY(polygonRadius,polygonAngle+((360/polygonSides)*p))
+            polygonCorners.append((math.floor(corner_x),math.floor(corner_y)))
+        dCol = Tools.streetColor
+        bCol = Tools.buildingColor
+        drawer.polygon(polygonCorners,bCol,dCol)
+        polygonCorners.append(polygonCorners[0])
+        drawer.line(polygonCorners,dCol,3)
     def drawRoads(self,image):
         drawer = ImageDraw.Draw(image)
         dCol = Tools.streetColor
-        roadRadius = 3
         numRoads = len([i for i in self.neighborPts if i.road == True])
-        if self.node.city != None or numRoads > 2:
-            for neighbor in self.neighborPts:
-                if neighbor.road == True:
-                    drawer.line([(neighbor.x,neighbor.y),(self.x,self.y)],dCol,math.floor(roadRadius*2))
-        else:
-            for neighbor in self.neighborPts:
-                if neighbor.road == True:
-                    for otherNeighbor in self.neighborPts:
-                        if otherNeighbor.x != neighbor.x and otherNeighbor.y != neighbor.y and otherNeighbor.road == True:
-                            drawer.line([(neighbor.x,neighbor.y),(otherNeighbor.x,otherNeighbor.y)],dCol,math.floor(roadRadius*2))
+        roadCenter = ()
+        if len(self.node.roads) > 0:
+            if self.node.city != None or numRoads > 0:
+                roadCenter = (self.x,self.y)
+                for neighbor in self.neighborPts:
+                    if neighbor.road == True:
+                        sharedRoad = False
+                        if neighbor.node in self.node.roads:
+                            sharedRoad = True
+                        if sharedRoad == True:
+                            drawer.line([(neighbor.x,neighbor.y),(self.x,self.y)],dCol,math.floor(self.roadRadius*2))
+            """
+            else:
+                for neighbor in self.neighborPts:
+                    if neighbor.road == True:
+                        for otherNeighbor in self.neighborPts:
+                            if otherNeighbor.x != neighbor.x and otherNeighbor.y != neighbor.y and otherNeighbor.road == True:
+                                drawer.line([(neighbor.x,neighbor.y),(otherNeighbor.x,otherNeighbor.y)],dCol,math.floor(self.roadRadius*2))
+                                roadCenter = ((neighbor.x+otherNeighbor.x)/2,(neighbor.y+otherNeighbor.y)/2)
+            """
         for k in self.blocks:
             if k.blockDist(self.x,self.y) < self.radius and k.col != Tools.waterColor:
                 k.drawSelf(drawer)
         for k in self.blocks:
             if k.blockDist(self.x,self.y) < self.radius and k.col != Tools.waterColor:
                 k.drawRoads(drawer)
+        nodeStructure = self.node.structure()
+        if self.node.city == None and nodeStructure != None:
+            if nodeStructure in ["farm","mill"]:
+                self.addFarm(drawer,roadCenter)
+            if nodeStructure == "fort":
+                self.addFort(drawer)
+            if nodeStructure in ["inn","brothel","workshop","mine","fishery","port"]:
+                self.addBuilding(drawer,roadCenter)
         scl = 1/BORDERSCALE
         h = self.yDim/scl
         w = self.xDim/scl
