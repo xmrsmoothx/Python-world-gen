@@ -20,7 +20,7 @@ class Event:
         self.actors = actrs
         self.importance = math.ceil(50*(random.uniform(0.1,0.6)**2))
         self.location = loc
-        if self.subject != None and self.kind in ["election","reformation"]:
+        if self.subject != None and self.kind in ["election","reformation","war","ceasefire"]:
             self.oldLeaderTitle = self.subject.culture.leaderTitle
             self.oldCultureName = self.subject.culture.shortName()
     def ageEvent(self):
@@ -31,14 +31,23 @@ class Event:
         return self.note()
     def note(self):
         s = "The "
-        s += self.kind + " of "
-        if self.kind == "reformation":
-            s += "the "
-        s += self.subject.justName()
+        if self.kind in ["war","ceasefire"]:
+            s += self.kind + " with "
+        else:
+            s += self.kind + " of "
+        if self.kind in ["reformation","war","ceasefire"]:
+            s += "the " + self.oldCultureName
+        else:
+            s += self.subject.justName()
         return s
     def summary(self):
         s = "the "
-        s += self.kind + " of the "
+        if self.kind == "war":
+            s += self.kind + " declared on the "
+        elif self.kind == "ceasefire":
+            s += self.kind + " signed with the "
+        else:    
+            s += self.kind + " of the "
         s += self.subject.nameFull()
         if self.actors != []:
             s += " by " + self.actors[0].justName()
@@ -62,7 +71,7 @@ class Event:
             s += str(self.age) + " years ago, "
         else:
             s += "Before time, "
-        if self.kind != "reformation":
+        if self.kind not in ["reformation","war"]:
             s += "the " + self.subject.nameFull()
         else:
             s += "the " + self.oldCultureName
@@ -78,6 +87,10 @@ class Event:
                 s += ""
             else:
                 s += " by the " + self.actors[0].nameFull()
+        if self.kind == "war":
+            s += " was attacked on the decision of the " + self.actors[0].nameFull()
+        if self.kind == "ceasefire":
+            s += " agreed to ceasefire with the " + self.actors[0].nameFull()
         if self.kind == "birth":
             s += " was born"
             if self.actors == []:
@@ -109,8 +122,8 @@ class Event:
             s += " was created"
             if self.actors == []:
                 s += ""
-            elif len(self.actors) == 1:
-                s += " by the " + self.actors[0].nameFull()
+            #elif len(self.actors) == 1:
+                #s += " by the " + self.actors[0].nameFull()
         s += ".\n"
         if self.location != None:
             s += "This happened at "

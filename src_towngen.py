@@ -214,7 +214,8 @@ class Town:
         self.mapName = "./generated/town_"+self.name+".gif"
         self.xDim = XDIM
         self.yDim = XDIM
-        self.landColor = self.myMap.biomeColors[self.node.biome]
+        #self.landColor = self.myMap.biomeColors[self.node.biome]
+        self.landColor = self.node.biomeColor
         self.streetColor = Tools.streetColor
         self.waterColor = Tools.waterColor
         self.x = self.xDim/2
@@ -283,12 +284,14 @@ class Town:
             s = StreetNode([xx,yy])
             if n.river != None:
                 s.type = "river"
-                s.drawCol = n.myMap.biomeColors[n.biome]
+                #s.drawCol = n.myMap.biomeColors[n.biome]
+                s.drawCol = n.biomeColor
             if n.bodyWater != None:
                 s.type = "water"
                 s.drawCol = self.waterColor
             elif self.node.elevation > n.elevation:
-                s.drawCol = n.myMap.biomeColors[n.biome]
+                s.drawCol = n.biomeColor
+                #s.drawCol = n.myMap.biomeColors[n.biome]
                 #s.drawCol = colAvg(n.myMap.biomeColors[n.biome],self.landColor)
             else:
                 s.drawCol = self.landColor

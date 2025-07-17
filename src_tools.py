@@ -36,6 +36,8 @@ class Tools:
     plotBackCol = (0,0,0)
     plotCol = (240,20,20)
     plotSecondCol = (0,240,0)
+    mountainHeight = 0.85
+    snowCapHeight = 0.91
     technologies = {}
     technologies["weaponry"] = 1
     technologies["defense"] = 1
@@ -51,6 +53,13 @@ class Tools:
     technologies["magic"] = 1
 
 class CombatTools:
+    endWarDistance = 1400
+    militaryAge = 19
+    warlikeSocieties = ["Pirates","Raiders"]
+    aggressiveSocieties = ["Imperiun","Empire","Hegemony","Monarchy",
+                                    "Religious Zealots","Revolutionary Commune",
+                                    "Shamanistic Warriors"]
+    battlingKinds = ["army","fleet","tactician","beast","magician"]
     armyTypes = ["assault infantry","guard infantry","siege","artillery","ranged infantry","mechanized","cavalry","fleet","beast"]
     standardArmyTypes = ["assault infantry","siege","artillery","ranged infantry","cavalry"]
     rps = {"assault infantry":["artillery","siege"],
@@ -71,7 +80,7 @@ class CombatTools:
                             "ranged infantry":[1.25,0.75,1.4],
                             "mechanized":[1.5,1.5,3],
                             "cavalry":[1.25,1,1.8],
-                            "fleet":[10,10,3]}
+                            "fleet":[10,10,4]}
     baseMilitarization = 0.08
     startingSkill = 0.4
     commandRanks = ["General","Colonel","Colonel","Commander","Commander","Commander","Captain","Captain","Captain","Captain","Captain","Captain"]
@@ -145,12 +154,13 @@ def synonym(x,seed=0,exclusive=0):
     s["darkness"] = ["darkness","night","twilight","dusk"]
     s["death"] = ["death","mortality","murder","the afterlife","killing"]
     s["ice"] = ["ice","snow","frost","cold"]
+    s["frost"] = ["frost","permafrost","ice","glaciers","icebergs","snow"]
     s["greed"] = ["greed","wealth","gold","riches","treasure"]
     s["growth"] = ["growth","sprouting","farming","bounty","harvest"]
     s["sky"] = ["sky","stars","heavens","clouds","cosmos"]
     s["superstition"] = ["superstition","religion","faith","theology","paranormal"]
     s["collectivism"] = ["collectivism","community","cooperation","communism","socialism"]
-    s["worship"] = ["worship","religion","monks","priests","prayer","mythology"]
+    s["worship"] = ["worship","religion","monks","priests","prayer","mythology","clergy"]
     s["individualism"] = ["individualism","liberation","liberty","anarchism","freedom"]
     s["large"] = ["large","sizable","grand","great"]
     s["huge"] = ["huge","giant","tremendous","colossal","massive"]
@@ -162,8 +172,8 @@ def synonym(x,seed=0,exclusive=0):
     s["song"] = ["song","concerto","sonnet","ballad","opera","suite","composition","arrangement","album"]
     s["play"] = ["play","musical","opera","satire","comedy","tragedy","drama"]
     s["poem"] = ["poem","sonnet","ballad","epic"]
-    s["weapon"] = ["sword","spear","greatsword","longsword","blade","rapier","crossbow",
-     "hammer","axe","staff","sceptre","mace","lance","rifle","pistol","longbow","shortbow","halberd","pike"]
+    s["weapon"] = ["sword","spear","greatsword","longsword","blade","rapier","crossbow","shortsword",
+     "warhammer","axe","staff","sceptre","mace","lance","rifle","pistol","longbow","shortbow","halberd","pike","claymore"]
     s["helmet"] = ["helmet","helm","crown","circlet","coif","headdress","coronet","diadem","sallet","bascinet","burgonet"]
     s["bodice"] = ["bodice","breastplate","hauberk","mail","brigandine","lamellar","platemail","cuirass","coat","vest"]
     s["shield"] = ["shield","buckler","kite shield","tower shield","targe","pavise","roundshield","greatshield","small shield"]
@@ -182,7 +192,7 @@ def synonym(x,seed=0,exclusive=0):
     s["transportation"] = ["transportation","sailing","travel","rail","roads","infrastructure","roadbuilding"]
     s["research"] = ["research","science","experiments","physics","mathematics","language"]
     s["art"] = ["art","painting","sculpting","singing","music","beauty","drawing"]
-    s["philosophy"] = ["philosophy","metaphysics","thought","ontology","epistemology","existentialism","knowledge"]
+    s["philosophy"] = ["philosophy","metaphysics","thought","ontology","epistemology","existentialism","knowledge","ethics"]
     s["medicine"] = ["medicine","anatomy","pharmaceuticals","surgery","illness","disease","pathogens","health"]
     s["artillery"] = ["artillery","howitzers","catapults","trebuchets","ballistas","cannons"]
     s["assault infantry"] = ["assault infantry","warriors","troopers","soldiers","infantrymen","fighters","brigade"]
