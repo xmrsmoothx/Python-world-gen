@@ -6,10 +6,73 @@ Created on Sat Mar  3 01:07:42 2018
 """
 
 import random
+from PIL import Image, ImageDraw, ImageTk
 from src_tools import *
 from src_events import *
 import string
 import math
+
+class Sigil:
+    def __init__(self,drawer,c,col,a=random.choice([-90,90]),s=None,o=None):
+        if s != None:
+            random.seed(s)
+        self.owner = o
+        self.center = c
+        self.components = []
+        self.numComponents = 0
+        self.seed = s
+        maxComponents = 3
+        minComponents = 0
+        maxRadius = 70
+        if self.owner != None:
+            maxComponents = math.floor(self.owner.numComponents/2)
+            maxRadius = math.floor(self.owner.radius/2.5)
+        if maxRadius <= 3:
+            return
+        self.radius = random.randint(3,maxRadius)
+        self.edgeCount = random.randint(-3,12)
+        self.circle = False
+        if self.edgeCount <= 2:
+            self.edgeCount = random.randint(3,12)
+            self.circle = True
+        if maxComponents > 0:
+            self.numComponents = random.randint(minComponents,maxComponents)
+        for componentIndex in range(self.numComponents):
+            maxCount = self.edgeCount
+            componentCount = random.choice(factorsOf(maxCount))
+            componentDist = random.randint(-math.floor(self.radius*0.4),math.floor(self.radius*0.33))
+            self.components.append({"count":componentCount,"dist":componentDist})
+        angleIncrement = 360/self.edgeCount
+        currentAngle = a
+        self.componentsOnEdges = False
+        if random.random() > 0.5:
+            self.componentsOnEdges = True
+            currentAngle = currentAngle - (angleIncrement*0.5)
+        self.star = False
+        if random.random() > 0.45 and self.edgeCount >= 5:
+            self.star = True
+        self.lineThickness = random.randint(1,3)
+        for vertexIndex in range(0,self.edgeCount):
+            for component in self.components:
+                componentIndex = (vertexIndex/self.edgeCount)*component["count"]
+                if componentIndex-math.floor(componentIndex) < 0.002:
+                    componentAngle = currentAngle
+                    componentDist = math.floor(self.radius+component["dist"])
+                    if self.componentsOnEdges == True:
+                        componentAngle += angleIncrement*0.5
+                    componentCenter = (self.center[0]+lengthDirX(componentDist,componentAngle),self.center[1]+lengthDirY(componentDist,componentAngle))
+                    addSigil = Sigil(drawer,componentCenter,col,a=componentAngle,s=self.seed*componentDist,o=self)
+            currentVertex = (self.center[0]+lengthDirX(self.radius,currentAngle),self.center[1]+lengthDirY(self.radius,currentAngle))
+            nextVertexAngle = currentAngle+angleIncrement
+            if self.star == True:
+                nextVertexAngle = currentAngle+(angleIncrement*2)
+            nextVertex = (self.center[0]+lengthDirX(self.radius,nextVertexAngle),self.center[1]+lengthDirY(self.radius,nextVertexAngle))
+            if self.circle == False:
+                drawer.line([currentVertex,nextVertex],col,self.lineThickness)
+            currentAngle += angleIncrement
+        if self.circle == True:
+            drawCircle(drawer,self.center[0],self.center[1],self.radius,col,out=True)
+                    
 
 class Item:
     def __init__(self,k,c,nn="",f=None,s=None,i=3,cr=None):
@@ -54,7 +117,7 @@ class Item:
                     #t = "\""
                 subname = t + self.subject.name.title().capitalize().replace("\"","") + t
         if nn == "":
-            n = random.choice(["a ","the "])
+            n = random.choice(["a ","the ",""])
             if self.kind == "book":
                 n += synonym("book")
                 if random.random() > 0.3:
@@ -153,6 +216,101 @@ class Item:
             if self.owner != None:
                 self.owner.inventory.remove(self)
             self.owner = None
+    def generateBookCover(self):
+        self.filename = "./generated/book_"+self.name+".gif"
+        sd = seedNum(self.name)
+        random.seed(sd)
+        marginSize = 8
+        self.xDim = BookTools.bookWidth+(marginSize*2)
+        self.yDim = BookTools.bookHeight+(marginSize*2)
+        img = Image.new('RGB',(self.xDim,self.yDim),(255,255,255))
+        backCol = (255,255,255)
+        drawer = ImageDraw.Draw(img)
+        numSigils = random.choice([0,0,1,1,2,2,2,3,3])
+        imageCenter = (self.xDim/2,self.yDim/2)
+        sigilLocation = imageCenter
+        if random.random() > 0.4:
+            sigilLocation = (sigilLocation[0],sigilLocation[1]-random.randint(-3,54))
+        if random.random() > 0.6:
+            sigilLocation = (sigilLocation[0]+random.randint(-30,30),sigilLocation[1])
+        jacketColor = random.choice(BookTools.jacketColors)
+        inkColor = random.choice(BookTools.inkColors)
+        while inkColor == jacketColor:
+            inkColor = random.choice(BookTools.inkColors)
+        trimColor = random.choice(BookTools.trimColors)
+        while trimColor == jacketColor:
+            trimColor = random.choice(BookTools.trimColors)
+        topY = marginSize
+        leftX = marginSize
+        bottomY = self.yDim-marginSize
+        rightX = self.xDim-marginSize
+        drawer.rectangle([(marginSize,marginSize),(self.xDim-marginSize,self.yDim-marginSize)],fill=jacketColor,outline=jacketColor)
+        for sigilIndex in range(numSigils):
+            sigilSeed = sd*(sigilIndex+1)
+            newSigil = Sigil(drawer,sigilLocation,inkColor,a=-90,s=sigilSeed,o=None)
+        random.seed(sd)
+        trimThickness = random.choice([0,0,2,2,2,2,2,3,4,5,6,7,8,10,12,14,16])
+        if trimThickness > 0:
+            topY = marginSize
+            leftX = marginSize
+            bottomY = self.yDim-marginSize
+            rightX = self.xDim-marginSize
+            trimTopY = topY+trimThickness
+            trimLeftX = leftX+trimThickness
+            trimBottomY = bottomY-trimThickness
+            trimRightX = rightX-trimThickness
+            drawer.rectangle([(leftX,topY),(rightX,trimTopY)],fill=trimColor)
+            drawer.rectangle([(leftX,trimBottomY),(rightX,bottomY)],fill=trimColor)
+            if random.random() > 0.5:
+                if self.culture.languageDirection == "right to left":
+                    drawer.rectangle([(leftX,topY),(trimLeftX,bottomY)],fill=trimColor)
+                else:
+                    drawer.rectangle([(trimRightX,topY),(rightX,bottomY)],fill=trimColor)
+            else:
+                drawer.rectangle([(trimRightX,topY),(rightX,bottomY)],fill=trimColor)
+                drawer.rectangle([(leftX,topY),(trimLeftX,bottomY)],fill=trimColor)
+        trimType = random.choice([None,None,"circle","triangle","square","circlesquare","squaretriangle","circletriangle","circlesquaretriangle"])
+        if trimType != None:
+            trimSize = trimThickness+random.randint(4,23)
+            trimCenters = [(leftX,topY),(rightX,topY),(leftX,bottomY),(rightX,bottomY)]
+            if random.random() < 0.5:
+                extraTrimRoll = random.random()
+                if random.random() < 0.4:
+                    trimCenters = []
+                if extraTrimRoll < 0.14:
+                    trimCenters.extend([(leftX,self.yDim/3),(rightX,self.yDim/3)])
+                elif extraTrimRoll < 0.28:
+                    trimCenters.extend([(leftX,self.yDim/3),(leftX,self.yDim/1.5),(rightX,self.yDim/1.5),(rightX,self.yDim/3),(self.xDim/2,bottomY),(self.xDim/2,topY)])
+                elif extraTrimRoll < 0.42:
+                    trimCenters.extend([(leftX,self.yDim/3),(self.xDim/2,topY),(rightX,self.yDim/3),(self.xDim/2,bottomY)])
+                elif extraTrimRoll < 0.56:
+                    trimCenters.extend([(leftX,self.yDim/2),(rightX,self.yDim/2)])
+                elif extraTrimRoll < 0.7:
+                    trimCenters.extend([(self.xDim/2,topY),(self.xDim/2,bottomY)])
+                elif extraTrimRoll < 0.84:
+                    trimCenters.extend([(leftX,self.yDim/3),(rightX,self.yDim/1.5),(leftX,self.yDim/1.5),(rightX,self.yDim/3)])
+                else:
+                    trimCenters.extend([(leftX,self.yDim/2),(self.xDim/2,topY),(rightX,self.yDim/2),(self.xDim/2,bottomY)])
+            trimIndex = 0
+            for trimCenter in trimCenters:
+                if trimIndex == 4:
+                    if random.random() < 0.4:
+                        trimType = random.choice(["circle","triangle","square"])
+                        trimSize = trimThickness+random.randint(3,17)
+                if "circle" in trimType:
+                    drawCircle(drawer,trimCenter[0],trimCenter[1],math.floor(trimSize*1.25),trimColor) 
+                if "square" in trimType:
+                    drawSquare(drawer,trimCenter[0],trimCenter[1],trimSize,trimColor)
+                if "triangle" in trimType:
+                    drawRhombus(drawer,trimCenter[0],trimCenter[1],math.floor(trimSize*1.5),trimColor)
+                trimIndex += 1
+        drawer.rectangle([(0,0),(self.xDim,topY)],fill=backCol,outline=None)
+        drawer.rectangle([(0,0),(leftX,self.yDim)],fill=backCol,outline=None)
+        drawer.rectangle([(rightX,0),(self.xDim,self.yDim)],fill=backCol,outline=None)
+        drawer.rectangle([(0,bottomY),(self.xDim,self.yDim)],fill=backCol,outline=None)
+        drawer.rectangle([(marginSize,marginSize),(self.xDim-marginSize,self.yDim-marginSize)],fill=None,outline=(0,0,0))
+        img.save(self.filename,"GIF")
+        return self.filename
     def justName(self):
         return self.name
     def nameFull(self):
@@ -177,7 +335,7 @@ class Item:
             s += " by the " + self.creator.nameFull()
         s += ".\n"
         self.material = None
-        if self.kind in ["story","book","poem","play","song"]:
+        if self.kind in BookTools.writtenWorks:
             self.material = synonym("paper",seedNum(self.name))
             s += "It is written on " + self.material
             s += " in the " + self.culture.name + " language"

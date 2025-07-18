@@ -65,13 +65,6 @@ def exclus(g):
         return -0.01
     return g
 
-def drawCircle(drawer,x,y,radius,color):
-    x1 = x-radius
-    x2 = x+radius
-    y1 = y-radius
-    y2 = y+radius
-    drawer.ellipse([(x1,y1),(x2,y2)],color)
-
 def enorm(a,b):
     j = abs(a**2) + abs(b**2)
     return math.sqrt(j)
@@ -224,9 +217,9 @@ class Town:
         if self.node.city != None:
             self.population = self.node.city.population
             self.wateryNeighbors = [u for u in self.node.neighbors if u.watery() == 1]
-            self.radius = math.floor(22+(self.population**(17/40)))*(1+(len(self.wateryNeighbors)/10))
+            self.radius = math.floor(22+(self.population**(17/40)))*(1+(len(self.wateryNeighbors)/16))
             if self.node.river != None:
-                self.radius = self.radius+16
+                self.radius = self.radius+13
         else:
             self.population = 0
             self.radius = 0

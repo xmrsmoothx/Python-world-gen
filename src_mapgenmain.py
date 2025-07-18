@@ -29,13 +29,6 @@ def smoothcurve(t):
 def A(dx, dy):
   return math.degrees( math.atan2(dy, dx) )
 
-def drawCircle(drawer,x,y,radius,color):
-    x1 = x-radius
-    x2 = x+radius
-    y1 = y-radius
-    y2 = y+radius
-    drawer.ellipse([(x1,y1),(x2,y2)],color)
-
 def drawTrapezoid(drawer,x1,y1,x2,y2,r1,r2,color):
     directAngle = A(x2-x1,y2-y1)
     pAngle = directAngle-90
@@ -254,15 +247,13 @@ class Node:
         vegFitness = ((tempFitness)*(elevationFitness+0.5)*(fertilityFitness+0.5)*(rainFitness))*45
         self.vegetation = clamp(vegFitness/128,0,1)
     def setBiome(self,sl):
-        if self.elevation > Tools.mountainHeight:
+        if self.elevation > Tools.mountainHeight*random.uniform(1,1.02):
                 self.biome = "mountains"
-        elif self.temp < 0.18:
+        elif self.temp < 0.2:
             if self.rainfall < 0.2:
                 self.biome = "frost"
-            elif self.rainfall < 0.36:
+            elif self.rainfall < 0.38:
                 self.biome = "tundra"
-            elif self.rainfall < 0.55:
-                self.biome = "shrubland"
             else:
                 self.biome = "boreal forest"
         elif self.temp < 0.27:
@@ -270,37 +261,53 @@ class Node:
                 self.biome = "frost"
             elif self.rainfall < 0.22:
                 self.biome = "tundra"
-            elif self.rainfall < 0.4:
+            elif self.rainfall < 0.3:
                 self.biome = "shrubland"
             else:
                 self.biome = "boreal forest"
-        elif self.temp < 0.34:
+        elif self.temp < 0.37:
             if self.rainfall < 0.14:
                 self.biome = "tundra"
-            elif self.rainfall < 0.19:
+            elif self.rainfall < 0.18:
                 self.biome = "shrubland"
-            elif self.rainfall < 0.55:
+            elif self.rainfall < 0.44:
                 self.biome = "boreal forest"
             else:
                 self.biome = "forest"
-        elif self.temp < 0.58:
-            if self.rainfall < 0.04:
+        elif self.temp < 0.5:
+            if self.rainfall < 0.02:
                 self.biome = "desert"
             elif self.rainfall < 0.07:
                 self.biome = "savanna"
-            elif self.rainfall < 0.11:
+            elif self.rainfall < 0.12:
                 self.biome = "shrubland"
-            elif self.rainfall < 0.6:
+            elif self.rainfall < 0.42:
                 self.biome = "forest"
             else:
                 self.biome = "tropical forest"
-        else:
-            if self.rainfall < 0.05:
+        elif self.temp < 0.67:
+            if self.rainfall < 0.03:
                 self.biome = "desert"
-            elif self.rainfall < 0.09:
+            elif self.rainfall < 0.06:
                 self.biome = "savanna"
-            elif self.rainfall < 0.14:
-                self.biome = "shrubland"
+            elif self.rainfall < 0.13:
+                self.biome = "forest"
+            else:
+                self.biome = "tropical forest"
+        elif self.temp < 0.85:
+            if self.rainfall < 0.07:
+                self.biome = "desert"
+            elif self.rainfall < 0.12:
+                self.biome = "savanna"
+            else:
+                self.biome = "tropical forest"
+        else:
+            if self.rainfall < 0.12:
+                self.biome = "desert"
+            elif self.rainfall < 0.2:
+                self.biome = "savanna"
+            elif self.rainfall < 0.34:
+                self.biome = "forest"
             else:
                 self.biome = "tropical forest"
         if self.watery() == 1:
@@ -855,7 +862,7 @@ class City:
         self.node.city = self
         self.population = pop
         self.cityTier = 6
-        self.popThresholds = [40,200,1000,10000,50000]
+        self.popThresholds = [50,300,1000,8000,40000]
         self.culture = None
         if cltr == None:
             self.culture = Culture(self.node,m)
@@ -1208,10 +1215,10 @@ class City:
         p1 = (xx,yy+3)
         drawer.line([p1,p0],fill=out,width=1)
     def drawCity(self,drawer,xx,yy,col,out):
-        p0 = (xx-2,yy-6)
-        p1 = (xx-2,yy+2)
-        p2 = (xx+2,yy+2)
-        p3 = (xx+2,yy-6)
+        p0 = (xx-2,yy-8)
+        p1 = (xx-3,yy+2)
+        p2 = (xx+3,yy+2)
+        p3 = (xx+2,yy-8)
         drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
         p0 = (xx-5,yy+1)
         p1 = (xx-5,yy-1)
@@ -1219,13 +1226,13 @@ class City:
         p3 = (xx+5,yy+1)
         p4 = (xx,yy+4)
         drawer.polygon([p0,p1,p2,p3,p4],outline=out,fill=col)
-        p0 = (xx+6,yy-3)
-        p1 = (xx+6,yy+2)
+        p0 = (xx+6,yy-4)
+        p1 = (xx+6,yy+3)
         p2 = (xx+4,yy+2)
         p3 = (xx+4,yy-3)
         drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
-        p0 = (xx-6,yy-3)
-        p1 = (xx-6,yy+2)
+        p0 = (xx-6,yy-4)
+        p1 = (xx-6,yy+3)
         p2 = (xx-4,yy+2)
         p3 = (xx-4,yy-3)
         drawer.polygon([p0,p1,p2,p3],outline=out,fill=col)
@@ -1439,6 +1446,7 @@ class Culture:
         self.unitbalance = CombatTools.unitBalance
         self.setGenderBalance()
         self.language = Language(self)
+        self.languageDirection = random.choice(["left to right","right to left"])
         self.name = self.language.name
         self.populations = {}
         self.magic = []
@@ -3701,7 +3709,8 @@ class Population:
                 f.path = None
                 if f.speed < self.speed:
                     baseSpeed = f.speed
-            if self.path.nextNode(self.location) in self.location.roads:
+            nextNode = self.path.nextNode(self.location)
+            if nextNode != None and nextNode in self.location.roads:
                 baseSpeed += 0.5
             numSteps = math.floor(baseSpeed)
             if random.random() < baseSpeed-numSteps:
@@ -4301,7 +4310,9 @@ class Path:
         if currentNode not in self.nodes:
             return None
         nodeIndex = self.nodes.index(currentNode)
-        if nodeIndex >= len(self.nodes):
+        if nodeIndex < 0:
+            return None
+        if nodeIndex >= len(self.nodes-1):
             return None
         return self.nodes[nodeIndex+1]
     def hasWater(self):
@@ -4773,10 +4784,10 @@ class Map:
         for l in self.landmasses:
             l.cullStreams(10)
     def addRandomPeaks(self):
-        peakCount = random.randint(2,6)
+        peakCount = random.randint(2,5)
         for n in range(peakCount):
-            peakHeight = random.uniform(0.75,0.95)
-            peakRadius = random.randint(65,150)
+            peakHeight = random.uniform(0.72,0.92)
+            peakRadius = random.randint(65,175)
             self.addPeaks(1,peakHeight,peakRadius)
     def addSineHill(self,xx,yy,maximum=0.4,radius=128):
         hillCenter = Node(xx,yy,world)
@@ -4801,7 +4812,7 @@ class Map:
             hillRad = avgRad*random.uniform(0.9,1.1)
             hillHeight = height*random.uniform(0.9,1.1)
             self.addSineHill(xx,yy,hillHeight,hillRad)
-    def addMountains(self,num=5,height=0.4):
+    def addMountains(self,num=5,height=0.5):
         avgRad = self.xDim/4
         for i in range(num):
             xx = math.floor(random.random()*self.xDim)
@@ -4809,7 +4820,7 @@ class Map:
             hillRad = avgRad*random.uniform(0.8,1.25)
             hillHeight = height*random.uniform(0.8,1.25)
             self.addSineHill(xx,yy,hillHeight,hillRad)
-    def addHills(self,num=8,height=0.3):
+    def addHills(self,num=8,height=0.4):
         avgRad = self.xDim/7
         for i in range(num):
             xx = math.floor(random.random()*self.xDim)
@@ -4818,13 +4829,16 @@ class Map:
             hillHeight = height*random.uniform(0.8,1.25)
             self.addSineHill(xx,yy,hillHeight,hillRad)
     def addShape(self,shape):
+        if shape == "noise":
+            self.elevationAdd(random.uniform(0.1,0.15))
+            self.smooth()
         if shape == "island" or shape == "volcanic":
-            self.addSineHill(self.xDim/2,self.yDim/2,0.5,radius=random.uniform(0.6,1.1)*self.xDim/1.9)
+            self.addSineHill(self.xDim/2,self.yDim/2,0.4,radius=random.uniform(0.6,1.1)*self.xDim/1.9)
             self.smooth(2)
             if shape == "volcanic":
                 self.elevationAdd(-0.1)
                 self.addSineHill(self.xDim/2,self.yDim/2,0.3,radius=random.uniform(0.6,1.1)*self.xDim*1.5)
-                self.addSineHill(self.xDim/2,self.yDim/2,0.3,radius=random.uniform(0.8,1.2)*self.xDim/4)
+                self.addSineHill(self.xDim/2,self.yDim/2,0.25,radius=random.uniform(0.8,1.2)*self.xDim/4)
                 self.smooth(1)
                 self.addHill(self.xDim/2,self.yDim/2,random.uniform(0.40,0.46),radius=random.uniform(0.5,1.1)*self.xDim/11)
                 self.addSineHill(self.xDim/2,self.yDim/2,-0.35,radius=random.uniform(0.6,1)*self.xDim/12)
@@ -4844,23 +4858,23 @@ class Map:
                 yy = self.yDim
             self.addSineHill(xx,yy,0.4,radius=self.xDim*1.3)
             if shape == "highlands":
-                self.addSineHill(self.xDim/2,self.yDim/2,0.3,radius=self.xDim*1.3)
+                self.addSineHill(self.xDim/2,self.yDim/2,0.25,radius=self.xDim*1.3)
                 self.addHills(random.randint(4,8),0.2)
                 self.addRandomPeaks()
             self.smooth(2)
         if shape == "archipelago":
-            self.addHills(random.randint(4,8),0.5)
+            self.addHills(random.randint(5,9),0.45)
             self.addRandomPeaks()
-            self.smooth(3)
+            self.smooth(2)
         if shape == "plain":
             self.addSineHill(self.xDim/2,self.yDim/2,0.6,radius=self.xDim*5)
             self.smooth(2)
-        if shape not in ["volcanic","archipelago"]:
+        if shape not in ["volcanic","noise"]:
             self.addMountains()
         self.addHills()
-        self.smooth(3)
+        self.smooth(2)
     def addRandomShape(self):
-        shp = random.choice(["highlands","volcanic","shore","archipelago","island"])
+        shp = random.choice(["highlands","volcanic","shore","archipelago","island","noise"])
         self.addShape(shp)
     def erode(self,strength=3):
         for j in range(strength):
@@ -4930,7 +4944,7 @@ class Map:
         for p in self.atlas:
             p.setBiome(self.sealevel)
             biomeColor = self.biomeColors[p.biome]
-            if p.biome == "mountains" and p.elevation > Tools.snowCapHeight and p.temp < 0.6:
+            if p.biome == "mountains" and p.elevation > Tools.snowCapHeight*random.uniform(1,1.02) and p.temp < 0.6:
                 biomeColor = self.biomeColors["frost"]
             p.setBiomeColor(biomeColor)
     def setWildlife(self):
@@ -5362,7 +5376,7 @@ class Map:
                or (cityNode.hasWaterNeighbor(self.sealevel) == 0 and q < tries)):
             q = q+1
             cityNode = random.choice(self.atlas)
-        newCity = City(cityNode,pop=random.randint(12,136),m=self)
+        newCity = City(cityNode,pop=random.randint(15,200),m=self)
     def scatterCities(self,n):
         for k in self.atlas:
             k.defaultRoads()
@@ -5571,6 +5585,14 @@ class Map:
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
+        if e.kind in BookTools.writtenWorks:
+            fn = e.generateBookCover()
+            photo = Image.open(fn)
+            self.bookCover = ImageTk.PhotoImage(photo)
+            self.bookLbl = Label(self.infoGui,image=self.bookCover)
+            self.bookLbl.config(borderwidth=32)
+            self.bookLbl.photo = photo
+            self.bookLbl.pack()
         self.eString = StringVar()
         self.eString.set(e.description())
         pdsc = Label(self.infoGui,textvariable=self.eString)
@@ -5763,7 +5785,6 @@ class Map:
         self.flagLbl.config(borderwidth=16)
         self.flagLbl.photo = photo
         self.flagLbl.pack()
-        
         nn = self.displayCulture.generateCultureFace(0)
         photo = Image.open(nn)
         self.faceImg = ImageTk.PhotoImage(photo)
@@ -5771,7 +5792,6 @@ class Map:
         self.faceLbl.config(borderwidth=8)
         self.faceLbl.photo = photo
         self.faceLbl.pack()
-        
         self.cultureString = StringVar()
         self.cultureString.set(self.displayCulture.cultureNotes())
         cdsc = Label(self.infoGui,textvariable=self.cultureString)
@@ -6138,10 +6158,10 @@ world.triangles = triangles
 
 print("Generating terrain...")
 world.perlinElevation(6)
-world.elevationAdd(-0.35)
+world.elevationAdd(-0.3)
 world.addRandomShape()
 world.addRandomPeaks()
-world.smooth()
+world.smooth(3)
 world.setSeaLevel(0.4)
 world.cullDots()
 world.clampElevation()

@@ -9,6 +9,46 @@ import random
 import math
 import numpy as np
 
+def factorsOf(a):
+    factrs = [a]
+    maximum = math.ceil(math.sqrt(a))
+    for i in range(2,math.ceil(maximum)+1):
+        if  a % i == 0:
+            factrs.append(i)
+            factrs.append(math.floor(a/i))
+    factrs = list(set(factrs))
+    return factrs
+
+def drawRhombus(drawer,x,y,radius,color,out=False):
+    x1 = x-radius
+    x2 = x+radius
+    y1 = y-radius
+    y2 = y+radius
+    if out == False:
+        drawer.polygon([(x1,y),(x,y1),(x2,y),(x,y2)],color)
+    if out == True:
+        drawer.polygon([(x1,y),(x,y1),(x2,y),(x,y2)],outline=color,fill=None)
+
+def drawSquare(drawer,x,y,radius,color,out=False):
+    x1 = x-radius
+    x2 = x+radius
+    y1 = y-radius
+    y2 = y+radius
+    if out == False:
+        drawer.rectangle([(x1,y1),(x2,y2)],color)
+    if out == True:
+        drawer.rectangle([(x1,y1),(x2,y2)],outline=color,fill=None)
+
+def drawCircle(drawer,x,y,radius,color,out=False):
+    x1 = x-radius
+    x2 = x+radius
+    y1 = y-radius
+    y2 = y+radius
+    if out == False:
+        drawer.ellipse([(x1,y1),(x2,y2)],color)
+    if out == True:
+        drawer.ellipse([(x1,y1),(x2,y2)],outline=color,fill=None)
+
 def lengthDirX(length, angle):
   radian_angle = math.radians(angle)
   return length * math.cos(radian_angle)
@@ -24,6 +64,14 @@ def getPrime(num):
 
 def nearestHundred(largeNum):
     return round(largeNum/100)*100
+
+class BookTools:
+    writtenWorks = ["book","story","poem","song","play"]
+    bookHeight = 350
+    bookWidth = 250
+    jacketColors = [(70,40,40),(40,60,40),(40,40,80),(12,12,12),(60,60,60),(165,160,150),(220,190,160),(50,50,50),(46,32,21),(70,60,80),(80,70,40),(60,80,80),(245,245,245),(36,26,24)]
+    inkColors = [(245,245,245),(240,180,20),(220,220,220),(0,0,0),(46,32,21),(36,26,24)]
+    trimColors = [(12,12,12),(245,245,245),(240,180,20),(220,220,220),(60,60,60),(46,32,21),(36,26,24)]
 
 class Tools:
     streetColor = (117, 96, 66)

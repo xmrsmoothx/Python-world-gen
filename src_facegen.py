@@ -7,6 +7,7 @@ Created on Sat Feb 16 18:02:07 2019
 
 import random
 import math
+from src_tools import *
 
 def clamp(x,minimum,maximum):
     if x < minimum:
@@ -15,13 +16,6 @@ def clamp(x,minimum,maximum):
         return maximum
     else:
         return x
-
-def drawCircle(drawer,x,y,radius,color):
-    x1 = x-radius
-    x2 = x+radius
-    y1 = y-radius
-    y2 = y+radius
-    drawer.ellipse([(x1,y1),(x2,y2)],color)
 
 def avg2(v1,v2):
     return ((v1+v1)/2)
