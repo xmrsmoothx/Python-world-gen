@@ -130,9 +130,9 @@ class Face:
                           math.floor(avg2(parent1.skincolor[1],parent2.skincolor[1])),
                           math.floor(avg2(parent1.skincolor[2],parent2.skincolor[2])))
         self.shadowcolor = (self.skincolor[0],self.skincolor[1],math.floor(self.skincolor[2]*0.65))
-        self.haircolor = (math.floor(avg2(parent1.skincolor[0],parent2.skincolor[0])),
-                          math.floor(avg2(parent1.skincolor[1],parent2.skincolor[1])),
-                          math.floor(avg2(parent1.skincolor[2],parent2.skincolor[2])))
+        self.haircolor = (math.floor(avg2(parent1.haircolor[0],parent2.haircolor[0])),
+                          math.floor(avg2(parent1.haircolor[1],parent2.haircolor[1])),
+                          math.floor(avg2(parent1.haircolor[2],parent2.haircolor[2])))
         self.eyecolor = (math.floor(avg2(parent1.eyecolor[0],parent2.eyecolor[0])),
                           math.floor(avg2(parent1.eyecolor[1],parent2.eyecolor[1])),
                           math.floor(avg2(parent1.eyecolor[2],parent2.eyecolor[2])))

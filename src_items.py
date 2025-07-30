@@ -6,7 +6,7 @@ Created on Sat Mar  3 01:07:42 2018
 """
 
 import random
-from PIL import Image, ImageDraw, ImageTk
+from PIL import Image, ImageFont, ImageDraw, ImageTk
 from src_tools import *
 from src_events import *
 import string
@@ -229,9 +229,9 @@ class Item:
         numSigils = random.choice([0,0,1,1,2,2,2,3,3])
         imageCenter = (self.xDim/2,self.yDim/2)
         sigilLocation = imageCenter
-        if random.random() > 0.4:
-            sigilLocation = (sigilLocation[0],sigilLocation[1]-random.randint(-3,54))
-        if random.random() > 0.6:
+        if random.random() < 0.6:
+            sigilLocation = (sigilLocation[0],sigilLocation[1]-random.randint(-10,54))
+        if random.random() < 0.33:
             sigilLocation = (sigilLocation[0]+random.randint(-30,30),sigilLocation[1])
         jacketColor = random.choice(BookTools.jacketColors)
         inkColor = random.choice(BookTools.inkColors)
@@ -249,6 +249,54 @@ class Item:
             sigilSeed = sd*(sigilIndex+1)
             newSigil = Sigil(drawer,sigilLocation,inkColor,a=-90,s=sigilSeed,o=None)
         random.seed(sd)
+        namePlate = random.choice([0,1,2])
+        chosenFontPath = random.choice(self.culture.language.fontPaths)
+        if namePlate > 0:
+            if random.random() < 0.4:
+                inkColor = random.choice(BookTools.inkColors)
+                while inkColor == jacketColor:
+                    inkColor = random.choice(BookTools.inkColors)
+            translatedTitle = self.culture.language.translatePassage(self.justName())
+            fontSize = BookTools.fontSize
+            chosenFont = ImageFont.truetype(chosenFontPath,fontSize)
+            namePlateCenter = (self.xDim/2,self.yDim-50)
+            if sigilLocation[1] >= self.yDim/2:
+                namePlateCenter = (self.xDim/2,50)
+            namePlateSize = drawer.multiline_textsize(translatedTitle, font=chosenFont)
+            lines = 1
+            while namePlateSize[0] > self.xDim-50:
+                fontSize -= 1
+                lines *= 2
+                indexToReplace = 0
+                secondIndexToReplace = 0
+                while indexToReplace < len(translatedTitle)/lines:
+                    indexToReplace = translatedTitle.find(" ",indexToReplace+1)
+                if lines > 2:
+                    secondIndexToReplace = translatedTitle.rfind(" ",0,len(translatedTitle)-indexToReplace)
+                translatedTitle = translatedTitle[:indexToReplace] + "\n" + translatedTitle[indexToReplace+1:]
+                if secondIndexToReplace != 0:
+                    translatedTitle = translatedTitle[:secondIndexToReplace] + "\n" + translatedTitle[secondIndexToReplace+1:]
+                chosenFont = ImageFont.truetype(chosenFontPath,fontSize)
+                namePlateSize = drawer.multiline_textsize(translatedTitle, font=chosenFont)
+            if self.culture.language.languageDirection == "right to left":
+                lines = translatedTitle.split("\n")
+                translatedTitle = ""
+                for line in lines:
+                    lineString = line[::-1]
+                    translatedTitle += lineString + "\n"
+                translatedTitle = translatedTitle[0:-1]
+            namePlateAnchor = (namePlateCenter[0]-(namePlateSize[0]/2),namePlateCenter[1]-(namePlateSize[1]/2))
+            if namePlate > 1:
+                namePlateColor = trimColor
+                if random.random() < 0.66:
+                    namePlateColor = random.choice(BookTools.trimColors)
+                namePlateTrim = None
+                if random.random() < 0.4:
+                    namePlateTrim = trimColor
+                while namePlateColor == jacketColor or namePlateColor == inkColor:
+                    namePlateColor = random.choice(BookTools.trimColors)
+                drawer.rectangle([(namePlateAnchor[0]-4,namePlateAnchor[1]-4),(namePlateCenter[0]+(namePlateSize[0]/2)+4,namePlateCenter[1]+(namePlateSize[1]/2)+4)],fill=namePlateColor,outline=namePlateTrim)
+            drawer.multiline_text(namePlateAnchor,translatedTitle,fill=inkColor,font=chosenFont,align="center")
         trimThickness = random.choice([0,0,2,2,2,2,2,3,4,5,6,7,8,10,12,14,16])
         if trimThickness > 0:
             topY = marginSize
@@ -262,7 +310,7 @@ class Item:
             drawer.rectangle([(leftX,topY),(rightX,trimTopY)],fill=trimColor)
             drawer.rectangle([(leftX,trimBottomY),(rightX,bottomY)],fill=trimColor)
             if random.random() > 0.5:
-                if self.culture.languageDirection == "right to left":
+                if self.culture.language.languageDirection == "right to left":
                     drawer.rectangle([(leftX,topY),(trimLeftX,bottomY)],fill=trimColor)
                 else:
                     drawer.rectangle([(trimRightX,topY),(rightX,bottomY)],fill=trimColor)
@@ -271,7 +319,7 @@ class Item:
                 drawer.rectangle([(leftX,topY),(trimLeftX,bottomY)],fill=trimColor)
         trimType = random.choice([None,None,"circle","triangle","square","circlesquare","squaretriangle","circletriangle","circlesquaretriangle"])
         if trimType != None:
-            trimSize = trimThickness+random.randint(4,23)
+            trimSize = trimThickness+random.randint(4,18)
             trimCenters = [(leftX,topY),(rightX,topY),(leftX,bottomY),(rightX,bottomY)]
             if random.random() < 0.5:
                 extraTrimRoll = random.random()
@@ -296,7 +344,7 @@ class Item:
                 if trimIndex == 4:
                     if random.random() < 0.4:
                         trimType = random.choice(["circle","triangle","square"])
-                        trimSize = trimThickness+random.randint(3,17)
+                        trimSize = trimThickness+random.randint(3,14)
                 if "circle" in trimType:
                     drawCircle(drawer,trimCenter[0],trimCenter[1],math.floor(trimSize*1.25),trimColor) 
                 if "square" in trimType:

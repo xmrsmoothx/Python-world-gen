@@ -58,7 +58,7 @@ def lengthDirY(length, angle):
   return length * math.sin(radian_angle)
 
 def getPrime(num):
-    primesList = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103]
+    primesList = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149,151]
     num = num % len(primesList)
     return primesList[num]
 
@@ -66,12 +66,22 @@ def nearestHundred(largeNum):
     return round(largeNum/100)*100
 
 class BookTools:
+    fontSize = 14
+    fontPaths = ["./fonts/ManufacturingConsent-Regular.ttf",
+                 "./fonts/OpenSans-Regular.ttf",
+                 "./fonts/Oswald-Regular.ttf",
+                 "./fonts/PTSerif-Regular.ttf",
+                 "./fonts/RobotoMono-Regular.ttf",
+                 "./fonts/DancingScript-Regular.ttf",
+                 "./fonts/Michroma-Regular.ttf",
+                 "./fonts/LobsterTwo-Regular.ttf",
+                 "./fonts/Pacifico-Regular.ttf"]
     writtenWorks = ["book","story","poem","song","play"]
     bookHeight = 350
     bookWidth = 250
-    jacketColors = [(70,40,40),(40,60,40),(40,40,80),(12,12,12),(60,60,60),(165,160,150),(220,190,160),(50,50,50),(46,32,21),(70,60,80),(80,70,40),(60,80,80),(245,245,245),(36,26,24)]
-    inkColors = [(245,245,245),(240,180,20),(220,220,220),(0,0,0),(46,32,21),(36,26,24)]
-    trimColors = [(12,12,12),(245,245,245),(240,180,20),(220,220,220),(60,60,60),(46,32,21),(36,26,24)]
+    jacketColors = [(70,40,40),(40,60,40),(40,40,80),(12,12,12),(60,60,60),(165,160,150),(220,190,160),(50,50,50),(46,32,21),(70,60,80),(80,70,40),(60,80,80),(235,235,235),(36,26,24)]
+    inkColors = [(235,235,235),(240,180,20),(0,0,0),(46,32,21),(36,26,24)]
+    trimColors = [(12,12,12),(235,235,235),(240,180,20),(60,60,60),(46,32,21),(36,26,24)]
 
 class Tools:
     streetColor = (117, 96, 66)
@@ -132,6 +142,7 @@ class CombatTools:
     baseMilitarization = 0.08
     startingSkill = 0.4
     commandRanks = ["General","Colonel","Colonel","Commander","Commander","Commander","Captain","Captain","Captain","Captain","Captain","Captain"]
+    navalRanks = ["Grand Admiral","Admiral","Admiral","Rear Admiral","Rear Admiral","Rear Admiral","Captain","Captain","Captain"]
 
 def clamp(x,minimum,maximum):
     if x < minimum:
@@ -189,7 +200,7 @@ def synonym(x,seed=0,exclusive=0):
     s["travelers"] = ["travelers","wanderers","nomads","migrants","itinerants","wayfarers"]
     s["sailors"] = ["sailors","mariners","wayfarers","navigation","seafaring"]
     s["swimming"] = ["swimming","sailing","navigating","diving","cruising"]
-    s["agriculture"] = ["agriculture","farming","irrigation","crops","cultivation","harvest"]
+    s["agriculture"] = ["agriculture","farming","cultivation","harvest"]
     s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
     s["village"] = ["village","hamlet"]
     s["township"] = ["township","settlement"]
@@ -213,7 +224,7 @@ def synonym(x,seed=0,exclusive=0):
     s["large"] = ["large","sizable","grand","great"]
     s["huge"] = ["huge","giant","tremendous","colossal","massive"]
     s["gigantic"] = ["gigantic","titanic","humongous","gargantuan","vast"]
-    s["book"] = ["book","record","volume","document","treatise","paper","study","codex","essay","meditations"]
+    s["book"] = ["book","record","volume","document","treatise","paper","study","codex","essay","meditations","manifesto","meditation","essays","records"]
     s["story"] = ["story","novel","epic","tale","legend","chronicle"]
     s["piece"] = ["painting","woodcut","drawing","sculpture","statue","bust","etching",
      "tapestry","fresco","mural"]
@@ -233,7 +244,7 @@ def synonym(x,seed=0,exclusive=0):
     s["paint"] = ["paint","oil","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
     s["weaponry"] = ["weaponry","combat","blades","war","battle","assault","killing"]
     s["defense"] = ["defense","combat","armor","war","battle","fortification"]
-    s["production"] = ["production","industry","factories","craftsmanship"]
+    s["production"] = ["production","industry","manufacturing"]
     s["mining"] = ["mining","minerals","mountains","metals","forging","excavation"]
     s["metallurgy"] = ["minerals","mountains","metals","forging","smithing","smelting"]
     s["government"] = ["government","bureaucracy","administration","authority","states","the state"]
@@ -249,11 +260,11 @@ def synonym(x,seed=0,exclusive=0):
     s["guard infantry"] = ["guard infantry","garrison","sentinels","defensive brigade","guardsmen","reserve"]
     s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carabiniers"]
     s["siege"] = ["siege","siege towers","battering rams","demolitionists","blockades","sappers"]
-    s["fleet"] = ["fleet","wing","detachment","flotilla","navy"]
+    s["fleet"] = ["fleet","wing","detachment","flotilla","battle group"]
     s["about"] = ["about","dealing with","related to","explaining","questioning",
      "investigating","on","concerning","relating to","challenging","exploring","pondering"]
     s["water"] = ["water","moisture","rain","rainfall","irrigation","fluids","humidity"]
-    s["magic"] = ["magic","witchcraft","wizardry","miracles","sorcery","alchemy","divination","voodoo","necromancy","thaumaturgy"]
+    s["magic"] = ["magic","witchcraft","wizardry","miracles","sorcery","alchemy","divination","voodoo","thaumaturgy"]
     s["church"] = ["church","cathedral","parish","chapel","temple","mosque","basilica","shrine","sanctuary","abbey"]
     s["cathedral"] = ["cathedral","basilica","grand mosque","archbasilica","grand cathedral","shrine","abbey"]
     s["palace"] = ["palace","castle","citadel","keep","throne","court"]
@@ -267,6 +278,13 @@ def synonym(x,seed=0,exclusive=0):
     s["builders"] = ["builders","construction","manufacturing","craftsmen","fabrication"]
     s["ruins"] = ["ruins","wreckage"]
     s["temperature"] = ["temperature","heat","sunlight","warmth","thermodynamics"]
+    s["minister"] = ["minister","secretary","chancellor","director","head","premier","chair","magistrate"]
+    s["war"] = ["war","defense","security"]
+    s["health"] = ["health","medicine","healthcare"]
+    s["infrastructure"] = ["infrastructure","transporation"]
+    s["state"] = ["state","government","the state"]
+    s["culture"] = ["culture","the arts"]
+    s["trade"] = ["trade","economy","exchange","finance"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)

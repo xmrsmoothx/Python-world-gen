@@ -217,9 +217,9 @@ class Town:
         if self.node.city != None:
             self.population = self.node.city.population
             self.wateryNeighbors = [u for u in self.node.neighbors if u.watery() == 1]
-            self.radius = math.floor(22+(self.population**(17/40)))*(1+(len(self.wateryNeighbors)/16))
+            self.radius = math.floor(23+math.sqrt(self.population))*(1+(len(self.wateryNeighbors)/16))
             if self.node.river != None:
-                self.radius = self.radius+13
+                self.radius = self.radius*1.2
         else:
             self.population = 0
             self.radius = 0
