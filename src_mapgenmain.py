@@ -1450,6 +1450,7 @@ class Culture:
         self.name = self.language.name
         self.populations = {}
         self.ministers = {}
+        self.organizations = []
         self.magic = []
         self.tech = {}
         for k in list(self.myMap.technologies.keys()):
@@ -1807,6 +1808,7 @@ class Culture:
             newContribution = math.floor((random.uniform(26,60)*(replaceAmount/adjustedLeaderCount)))
             self.leader.age = currentContribution+newContribution
             self.leader.number = adjustedLeaderCount
+        self.createOrgs()
         nn = 0.2
         pp = self.populationCount()
         figs = len(self.populations)
@@ -1864,6 +1866,46 @@ class Culture:
         pp = self.populationCount()
         adjustedLeaderCount = math.ceil(self.leaderCount*math.log10(max(pp,10)))
         return adjustedLeaderCount
+    def createOrgs(self):
+        numOrgs = len(self.organizations)
+        livingPops = self.getLivingPeople()
+        nonMemberPops = [p for p in livingPops if len(p.memberOfOrganizations) == 0]
+        nonMemberRatio = len(nonMemberPops)/len(livingPops)
+        roll = random.random()
+        roll = roll**2
+        if len(nonMemberPops) == 0:
+            return
+        if len(nonMemberPops) < 2:
+            roll = roll**2
+        if roll > 0.08+(math.sqrt(numOrgs+20)*0.08):
+            objectOfOrg = None
+            if random.random() > (1-(math.sqrt(len(self.deities))*0.18))+(math.sqrt(numOrgs)*0.06):
+                possibleObjects = self.deities + self.deities + [p for p in livingPops if p.profession == "priest"]
+                objectOfOrg = random.choice(possibleObjects)
+                tries = 0
+                while objectOfOrg in [o.object for o in self.organizations] and tries < 10:
+                    objectOfOrg = random.choice(possibleObjects)
+                    tries += 1
+            numMembers = random.uniform(1,math.sqrt(len(livingPops)))
+            numMembers = math.ceil(numMembers*math.sqrt(nonMemberRatio))
+            if numMembers == 1:
+                return
+            selectablePops = []
+            for c in self.cultureCities():
+                selectablePops += [p for p in c.node.entities if p.kind == "person" and p.dead == 0 and len(p.memberOfOrganizations) < 4]
+            if self.leader not in selectablePops and len(self.leader.memberOfOrganizations) < 2:
+                selectablePops.append(self.leader)
+            selectedMembers = []
+            tries = 0
+            while len(selectedMembers) < numMembers and len(selectablePops) > 0 and tries < numMembers:
+                selectedMember = random.choice(selectablePops)
+                selectedMembers.append(selectedMember)
+                selectablePops.remove(selectedMember)
+                tries += 1
+            if len(selectedMembers) > 1:
+                newOrg = Organization(f=selectedMembers,o=objectOfOrg)
+                e = Event(self.culture.myMap,a=0,kind="founding",sub=newOrg,actrs=selectedMembers)
+                e.importance += newOrg.mostImportantMember().importance*0.33
     def election(self):
         if self.leaderCount > 1:
             self.leader.kill((1-self.happiness())*self.leader.number)
@@ -2513,6 +2555,89 @@ class Culture:
         plotImg.save(fileName,"GIF")
         return fileName
 
+class Organization:
+    def __init__(self,f=[],o=None,n=None):
+        self.tt = "org"
+        self.civilianPopulation = 0
+        self.members = []
+        self.founders = []
+        self.field = None
+        self.age = 0
+        for p in f:
+            self.addFounder(p)
+        self.name = n
+        self.devote(o)
+        self.culture = None
+        if len(f) > 0:
+            cultures = [p.culture for p in f]
+            self.culture = mode(cultures)
+        elif o != None:
+            self.culture = o.culture
+        if self.culture != None:
+            self.culture.organizations.append(self)
+        self.name = self.generateName(n)
+    def generateName(self,n):
+        objectOfName = n
+        typeOfName = "party"
+        if self.object != None:
+            objectOfName = self.object.justName()
+            if self.object.kind == "deity" or self.object.kind == "location" or self.object.profession == "priest":
+                typeOfName = "cult"
+        elif len(self.founders) > 0:
+            fields = [p.field for p in self.founders if p.field != None]
+            mostCommonField = mode(fields)
+            if self.field == None:
+                self.field = mostCommonField
+            objectOfName = synonym(mostCommonField)
+        if objectOfName == None or objectOfName == "":
+            objectOfName = self.culture.language.genName()
+        objectOfName = string.capwords(objectOfName)
+        typeOfName = string.capwords(synonym(typeOfName))
+        if random.random() < 0.5:
+            name = objectOfName + " " + typeOfName
+            return name
+        else:
+            name = typeOfName + random.choice([" of "," of "," of "," for "]) + objectOfName
+            return name
+    def addMember(self,p):
+        if p in self.members:
+            return
+        self.members.append(p)
+        p.memberOfOrganizations.append(self)
+    def addFounder(self,p):
+        self.addMember(p)
+        self.founders.append(p)
+        p.founderOfOrganizations.append(self)
+    def removeMember(self,p):
+        if p in self.members:
+            self.members.remove(p)
+        if self in p.memberOfOrganizations:
+            p.memberOfOrganizations.remove(p)
+    def devote(self,o):
+        self.object = o
+        if o == None:
+            return
+        o.objectOfOrganizations.append(self)
+        self.field = o.field
+    def getLivingMembers(self):
+        return [p for p in self.members if p.dead == 0]
+    def mostImportantMember(self):
+        if len(self.members) == 0:
+            return None
+        chosenMember = self.members[0]
+        if len(self.members) == 1:
+            return chosenMember
+        for m in self.members:
+            if m.importance > chosenMember.importance:
+                chosenMember = m
+        return chosenMember
+    def livingMemberCount(self):
+        return sum([p.number for p in self.getLivingMembers()]) + self.civilianPopulation
+    def justName(self):
+        return self.name
+    def nameFull(self):
+        return self.culture.name + " " + self.name
+
 class Concept:
     def __init__(self,n,s):
         self.conceptName = n
@@ -2614,6 +2739,14 @@ class ConceptualSpheres:
     def allConcepts(self):
         conceptNames = self.concepts.keys()
         return conceptNames
+    def conceptDistance(self,c0,c1):
+        if c0 not in self.concepts.keys():
+            return 100
+        concept0 = self.concepts[c0]
+        if c1 not in concept0.links.keys():
+            return 100
+        linkedDist = self.concepts[c0].links[c1]
+        return linkedDist
 
 class Opinion:
     def __init__(self,c,o):
@@ -3254,13 +3387,16 @@ class Population:
         self.followers = []
         self.culture = c
         self.originalCulture = c
+        self.memberOfOrganizations = []
+        self.founderOfOrganizations = []
+        self.objectOfOrganizations = []
         self.number = p
         self.condition = 1
         self.profession = prf
         self.kind = kind
         self.speed = 3
         self.power = [1,1]
-        self.importance = math.floor((random.random()**2)*20)
+        self.importance = math.ceil((random.random()**2)*20)
         self.magic = []
         self.birthEvent = None
         self.deathEvent = None
@@ -3268,7 +3404,6 @@ class Population:
         self.associations = []
         self.skill = random.random()
         self.skill = self.skill**2
-        self.importance *= (1+self.skill)
         if i != None:
             self.importance = i
         if len(self.parents) > 0:
@@ -3420,6 +3555,7 @@ class Population:
     def associate(self):
         k = random.choice(list(self.culture.myMap.spheres))
         self.associations.append(k)
+        self.field = k
         self.descrip()
     def genBeast(self):
         self.gender = random.choice([1,2])
@@ -3728,15 +3864,74 @@ class Population:
                         or "war" in theirOpinion.activeActions or "closed borders" in theirOpinion.activeActions):
                         newBattle = Battle(n)
                         return newBattle
+    def manageOrgs(self):
+        if self.dead == 1 or self.location == None:
+            return
+        if self.kind != "person" and self.culture.leader != self:
+            return
+        # Increase my own importance and skill depending on the importance and skill of people in the org
+        for o in self.memberOfOrganizations:
+            mostImportantMember = o.mostImportantMember()
+            if mostImportantMember == self:
+                self.importance *= 1+(len(o.getLivingMembers())*0.001)
+            else:
+                self.importance *= 1.002
+            skills = [m.skill for m in o.getLivingMembers()]
+            maxSkill = max(skills)
+            if maxSkill > self.skill:
+                self.skill *= 1.001
+            if o.object != None and o.object.importance < 80:
+                o.object.importance *= 1.001
+        roll = random.random()
+        if len(self.memberOfOrganizations) == 0:
+            if roll > 0.5:
+                return
+        elif len(self.memberOfOrganizations) == 1:
+            if roll > 0.1:
+                return
+        elif len(self.memberOfOrganizations) == 2:
+            if roll > 0.02:
+                return
+        else:
+            return
+        # Choose from possible orgs to join
+        orgsToChooseFrom = []
+        for p in self.location.entities:
+            orgsToChooseFrom += p.memberOfOrganizations
+            orgsToChooseFrom += p.objectOfOrganizations
+        if self.location.city != None:
+            orgsToChooseFrom += self.location.culture.organizations
+        orgsToChooseFrom = [o for o in orgsToChooseFrom if o not in self.memberOfOrganizations]
+        for possibleOrg in orgsToChooseFrom:
+            rollThreshold = 0.98
+            if possibleOrg.field != None:
+                if possibleOrg.field == self.field:
+                    rollThreshold = 0.4
+                else:
+                    rollThreshold = self.culture.conceptualSpheres.conceptDistance(self.field,possibleOrg.field)
+                    rollThreshold = math.sqrt(rollThreshold)
+            roll = random.random()
+            roll = roll**2
+            if possibleOrg.culture != self.culture:
+                rollThreshold = math.sqrt(rollThreshold)
+            if roll > rollThreshold:
+                possibleOrg.addMember(self)
+                return
+    def maxImportance(self):
+        return max(10*math.sqrt(self.baseImportance),self.baseImportance)
     def agePop(self,scl):
         self.age += scl
-        self.importance = clamp(self.importance*1.002,1,(math.log(max(self.baseImportance*1.5,2)))**3)
+        if self.importance < 1:
+            self.importance = 1
+        if self.importance < self.maxImportance():
+            self.importance = self.importance*1.0017
         if self.dead == 1:
             return -1
         if random.random() > 0.9:
             self.createWork()
-        self.skill = clamp(self.skill*random.uniform(1.005,1.01),0,1)
+        self.skill = clamp(self.skill*random.uniform(1.002,1.009),0,1)
         self.offspring()
+        self.manageOrgs()
         myCompetency = self.getCompetency()
         if self.qualifiesForMinister() == True:
             ministerTitle = self.getMinisterTitle()
@@ -4017,6 +4212,8 @@ class Population:
             return -1
         if self.age < 15:
             return -1
+        if self.location == None:
+            return -1
         kind = "book"
         subj = None
         # Below, roll the chance to produce something other than a non fiction Book
@@ -4106,15 +4303,15 @@ class Population:
         skillMultiplier = 1.01
         if w.importance >= 11:
             skillMultiplier = random.uniform(1.01,1.03)
-            self.importance = self.importance*random.uniform(1.07,1.2)
-            techMultiplier = ((random.uniform(0.001,0.003))+1)
+            self.importance = self.importance*random.uniform(1.02,1.08)
+            techMultiplier = ((random.uniform(0,0.003))+1)
             if w.field in self.culture.tech.keys():
                 self.culture.tech[w.field] *= techMultiplier
             elif self.field in self.culture.tech.keys():
                 self.culture.tech[self.field] *= techMultiplier
         self.skill = clamp(self.skill*skillMultiplier,0,1)
         self.works.append(w)
-        self.importance = self.importance*random.uniform(1.01,1+(self.skill/2.5))
+        self.importance = self.importance*random.uniform(1,1+(self.skill/15))
     def getCompetency(self):
         return math.sqrt(self.importance+20)**(1+self.skill)
     def qualifiesForMinister(self):
@@ -4317,6 +4514,17 @@ class Population:
                     s += ",\n and the "
                 s += cc.nameFull()
             s += ".\n"
+        for o in self.memberOfOrganizations:
+            s += self.pronouns[self.gender].capitalize() + " " + self.toBe[self.gender]
+            s += " a "
+            if o in self.founderOfOrganizations:
+                s += "founding "
+            s += "member of the " + o.name
+            s += ".\n"
+        for o in self.objectOfOrganizations:
+            s += self.pronouns[self.gender].capitalize() + " " + self.toBe[self.gender]
+            s += " the object of veneration for the " + o.name
+            s += ".\n"
         if self.kind == "beast" or self.kind == "army":
             s += self.possessive[self.gender].capitalize()
             s += " offensive power is approximately equal to "
@@ -4345,11 +4553,11 @@ class Population:
         s += "\n" + self.pronouns[self.gender].capitalize() + " " + self.toBe[self.gender] + " generally considered "
         if self.importance < 10:
             s += "unimportant"
-        elif self.importance < 23:
+        elif self.importance < 26:
             s += "important"
-        elif self.importance < 47:
+        elif self.importance < 53:
             s += "very important"
-        elif self.importance < 65:
+        elif self.importance < 80:
             s += "extremely important"
         else:
             s += "legendary"
@@ -5731,7 +5939,7 @@ class Map:
         b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
         c1 = "medium aquamarine"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-        if e.subject.tt != "item":
+        if e.subject.tt not in ["item"]:
             g = e.subject
             s = " "+g.justName()+" "
             b1 = Button(self.infoGui,text=s)
@@ -5848,6 +6056,9 @@ class Map:
     def popInfo(self,p=None):
         if p == None:
             return -1
+        if p.tt == "org":
+            self.orgListInfo(o=p)
+            return -1
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
@@ -5864,7 +6075,7 @@ class Map:
         pdsc = Label(self.infoGui,textvariable=self.popString)
         pdsc.pack(anchor=W,side=RIGHT)
         self.displayCulture = p.culture
-        if p.kind == "city":
+        if p.tt == "city":
             return
         if p.kind != "beast":
             b1 = Button(self.infoGui,text="Society Info",command=self.cultureInfo)
@@ -5920,6 +6131,20 @@ class Map:
             b1.configure(command = lambda self=self, d = l: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "SteelBlue4"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        for o in p.objectOfOrganizations:
+            s = " "+o.justName()+" "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = o: self.orgListInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SlateBlue1"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        for o in p.memberOfOrganizations:
+            s = " "+o.justName()+" "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = o: self.orgListInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SlateBlue2"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
         for g in [g for g in p.works if g.owner != p]:
             s = " "+g.justName()+" (Creation) "
@@ -6018,6 +6243,36 @@ class Map:
         b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
         c1 = "medium aquamarine"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+    def orgListInfo(self,o=None):
+        if o == None:
+            return
+        if self.extraGui != None:
+            self.extraGui.destroy()
+        self.extraGui = Toplevel()
+        popsList = [p for p in o.members]
+        if o.object != None:
+            popsList = [o.object] + popsList
+        numPops = len(popsList)
+        rows = math.ceil(2*math.sqrt(numPops))
+        count = 0
+        currentFrame = Frame(self.extraGui)
+        for i in popsList:
+            s = " The "+i.nameFull()+" "
+            b1 = Button(currentFrame,text=s)
+            b1.configure(command = lambda self=self, d = i: self.popInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=X)
+            c1 = "SteelBlue2"
+            if i in o.founders:
+                c1 = "SlateBlue1"
+            if i == o.object:
+                c1 = "light goldenrod"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+            count += 1
+            if count == rows:
+                count = 0
+                currentFrame.pack(anchor=S,side=LEFT,expand=YES,fill=Y)
+                currentFrame = Frame(self.extraGui)
+        currentFrame.pack(anchor=N,side=LEFT,expand=YES,fill=NONE)
     def popListInfo(self):
         if self.displayCulture == None:
             return -1

@@ -65,6 +65,21 @@ def getPrime(num):
 def nearestHundred(largeNum):
     return round(largeNum/100)*100
 
+def mode(lst):
+    if lst == None or len(lst) == 0:
+        return None
+    lstDict = {}
+    for lstElement in lst:
+        if lstElement in lstDict.keys():
+            lstDict[lstElement] = lstDict[lstElement]+1
+        else:
+            lstDict[lstElement] = 1
+    mostElement = lst[0]
+    for element in lstDict.keys():
+        if lstDict[element] > lstDict[mostElement]:
+            mostElement = element
+    return mostElement
+
 class BookTools:
     fontSize = 14
     fontPaths = ["./fonts/ManufacturingConsent-Regular.ttf",
@@ -242,14 +257,14 @@ def synonym(x,seed=0,exclusive=0):
     s["stone"] = ["stone","granite","basalt","obsidian","limestone","sandstone","slate","marble","gneiss"]
     s["metal"] = ["metal","steel","iron","bronze","brass","copper","silver","gold","titanium","aluminium","tin","nickel","electrum","platinum"]
     s["paint"] = ["paint","oil","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
-    s["weaponry"] = ["weaponry","combat","blades","war","battle","assault","killing"]
+    s["weaponry"] = ["weaponry","combat","blades","war","battle","assault","conquest"]
     s["defense"] = ["defense","combat","armor","war","battle","fortification"]
     s["production"] = ["production","industry","manufacturing"]
     s["mining"] = ["mining","minerals","mountains","metals","forging","excavation"]
     s["metallurgy"] = ["minerals","mountains","metals","forging","smithing","smelting"]
     s["government"] = ["government","bureaucracy","administration","authority","states","the state"]
     s["transportation"] = ["transportation","sailing","travel","rail","roads","infrastructure","roadbuilding"]
-    s["research"] = ["research","science","experiments","physics","mathematics","language"]
+    s["research"] = ["research","science","experiments","physics","mathematics","language","study"]
     s["art"] = ["art","painting","sculpting","singing","music","beauty","drawing"]
     s["philosophy"] = ["philosophy","metaphysics","thought","ontology","epistemology","existentialism","knowledge","ethics"]
     s["medicine"] = ["medicine","anatomy","pharmaceuticals","surgery","illness","disease","pathogens","health"]
@@ -285,6 +300,8 @@ def synonym(x,seed=0,exclusive=0):
     s["state"] = ["state","government","the state"]
     s["culture"] = ["culture","the arts"]
     s["trade"] = ["trade","economy","exchange","finance"]
+    s["party"] = ["party","league","organization","advocates","followers","guild","congress","caucus","fraternity","syndicate","conference"]
+    s["cult"] = ["cult","church","clergy","worshippers","followers","priests","disciples","apostles","devotees","prophets","evangelists"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)

@@ -79,6 +79,9 @@ class Event:
             s += " was founded"
             if len(self.actors) == 1:
                 s += " by the " + self.actors[0].nameFull()
+            else:
+                s += " by the " + self.actors[0].nameFull()
+                s += " and the " + self.actors[1].nameFull()
         if self.kind == "genesis":
             s += " came into being"
         if self.kind == "reformation":
