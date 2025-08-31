@@ -114,8 +114,13 @@ class Item:
                 self.importance = clamp(self.importance+math.sqrt(self.subject.importance)/2,self.importance,self.importance*3)
                 t = ""
                 #if self.subject.kind in ["book","story","piece","poem","song","play"]:
-                    #t = "\""
-                subname = t + self.subject.name.title().capitalize().replace("\"","") + t
+                #    t = ""
+                subname = t + string.capwords(self.subject.name.replace("\"","")) + t
+        connectorCount = 0
+        connectorLimit = 5
+        connectorWords = [" a "," the "," on "," about "," regarding "," relating "," of "]
+        for connector in connectorWords:
+            connectorCount += (" "+subname.lower()).count(connector)
         if nn == "":
             n = random.choice(["a ","the ",""])
             if self.kind == "book":
@@ -123,14 +128,14 @@ class Item:
                 if random.random() > 0.3:
                     n += " " + random.choice(["about ","on ","on ","of ","relating to ","regarding "])
                 else:
-                    n = random.choice(["on ","about ","of ","regarding "])
+                    n = random.choice(["on ","about ","of "])
                 if self.subject == None:
                     if random.random() > 0.2:
                         n += synonym(self.field)
                     else:
                         n = synonym(self.field)
                 else:
-                    if random.random() > 0.4:
+                    if random.random() > 0.4 and connectorCount < connectorLimit:
                         n += subname
                     else:
                         n += synonym(self.field)
@@ -143,7 +148,7 @@ class Item:
                         n += synonym(self.kind)
                     n += " " + random.choice(["on ","of ","regarding ","about "])
                     roll2 = random.random()
-                    if roll2 > 0.4 and self.subject != None:
+                    if roll2 > 0.4 and self.subject != None and connectorCount < connectorLimit:
                         n += subname
                     elif roll2 > 0.6 and self.subject == None:
                         n += synonym(self.field)
@@ -190,13 +195,13 @@ class Item:
                 else:
                     n += self.subkind
                     n += " of "
-                    if self.subject != None and random.random() > 0.2:
+                    if self.subject != None and random.random() > 0.2 and connectorCount < connectorLimit:
                         n += subname
                     else:
                         n += self.culture.language.genName()
         else:
             n = nn
-        self.name = string.capwords(n).title()
+        self.name = string.capwords(n)
     def move(self,loc):
         if loc == self.location:
             return -1

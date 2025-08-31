@@ -901,13 +901,13 @@ class City:
         distanceToCapital = 0
         if self.node != self.culture.origin:
             distanceToCapital = self.node.dist(self.culture.origin)
-        # Reduce the magnitude of certain happiness effects by up to 30% for cities 500 pixels away from the capital
-        distanceModifier = clamp(1-((distanceToCapital/500)*0.3),0.6,1)
+        # Reduce the magnitude of certain happiness effects by up to 33% for cities 500 pixels away from the capital
+        distanceModifier = clamp(1-((distanceToCapital/500)*0.33),0.66,1)
         # Decrease happiness as population increases
         h = h-(math.log10(self.population)/100)
         # Add a constant modifier to happiness for certain societies
         if self.culture.society in CombatTools.warlikeSocieties:
-            h = h-0.10
+            h = h-0.09
         if self.culture.society in CombatTools.aggressiveSocieties:
             h = h-0.05
         if self.culture.society in ["Nomads","Tribe","Nomadic tribe","Hunter-gatherer tribe","Nomadic artisans"]:
@@ -939,7 +939,7 @@ class City:
         for a in self.node.entities:
             if a.kind == "army":
                 h -= 0.01
-        # Add or remove happiness relative to the competence of current the leader
+        # Add or remove happiness relative to the skill of the current leader
         leader = self.culture.leader
         if leader.skill < 0.5:
             h -= (leader.skill*0.15)*distanceModifier
@@ -947,13 +947,13 @@ class City:
             h += ((leader.skill-0.5)*0.15)*distanceModifier
         # Grant a bonus (or penalty) to happiness for each action, proportional to what fraction of all (active) opinions have this action
         actionModifiers = {}
-        actionModifiers["war"] = -0.4
+        actionModifiers["war"] = -0.25
         actionModifiers["alliance"] = 0.25
-        actionModifiers["aid"] = 0.15
+        actionModifiers["aid"] = 0.1
         actionModifiers["closed borders"] = -0.1
-        actionModifiers["non aggression pact"] = 0.15
-        actionModifiers["trade embargoes"] = -0.1
-        actionModifiers["trade agreements"] = 0.15
+        actionModifiers["non aggression pact"] = 0.12
+        actionModifiers["trade embargoes"] = -0.07
+        actionModifiers["trade agreements"] = 0.2
         actionModifiers["cultural exchange"] = 0.1
         activeOpinions = [o for o in self.culture.cultureOpinions.values() if o.activeActions != []]
         opinionCount = len(activeOpinions)
@@ -1039,8 +1039,18 @@ class City:
         growth = clamp(diff/mpc,-self.population*0.12,self.population*0.06)
         if self.population < 20:
             growth = clamp(growth,1,100)
-        self.population = math.ceil(self.population*0.983)  # Age related death
+        self.population = math.ceil(self.population*0.99)  # Age related death
         self.population = clamp(math.floor(self.population+growth+random.choice([-1,0,0,0,0,1])),1,10000000)
+        for i in self.myMap.illnesses:
+            if self.name in i.cities.keys():
+                lethality = random.uniform(0,i.mortality/math.sqrt(self.culture.tech["medicine"]))
+                deaths = math.floor(lethality*i.cities[self.name])
+                self.population = clamp(self.population-deaths,1,10000000)
+                i.cities[self.name] = clamp(i.cities[self.name]-deaths,0,1000000)
+                i.cities[self.name] = clamp(math.floor(i.cities[self.name]*random.uniform(1,i.infectivity)),0,self.population)
+                curability = (1/i.length)*math.sqrt(self.culture.tech["medicine"])
+                if random.random() < curability or i.cities[self.name] == 0:
+                    del i.cities[self.name]
         self.cityType = self.cType(self.population)
         self.diaspora()
         self.cType(self.population)
@@ -1060,7 +1070,7 @@ class City:
             self.threshold *= 0.9
         if "naturalism" in m:
             self.threshold *= 0.9
-        if "materialists" in m:
+        if "materialism" in m:
             self.threshold *= 1.1
         if "agriculture" in m:
             self.threshold *= 1.1
@@ -1434,6 +1444,7 @@ class Culture:
         self.culture = self
         self.tt = "culture"
         self.hereditaryRule = False
+        self.religiousRule = False
         self.strength = 1
         self.origin = n
         self.myMap = m
@@ -1557,7 +1568,7 @@ class Culture:
         return 1+militarizedWeightPercentage
     def getArmies(self):
         returnedArmies = []
-        for p in (e for e in self.populations.values() if (e.dead == 0 and (e.kind in ["army","fleet"] or (e.profession == "tactician" and e.culture == self.culture and e.age > CombatTools.militaryAge)))):
+        for p in (e for e in self.populations.values() if (e.dead == 0 and (e.kind in ["army","fleet"] or ((e.profession == "tactician" or e.profession == "assassin") and e.culture == self.culture and e.age > CombatTools.militaryAge)))):
             if p.leader == None:
                 if p.profession == "tactician" and len(p.followers) > 0:  
                     followerKinds = [k.kind for k in p.followers]
@@ -1708,6 +1719,8 @@ class Culture:
             for myMinister in self.ministers.values():
                 if myMinister.field == t:
                     multiplierChoices.append(0.002)
+                    if myMinister.getCompetency() >= 20:
+                        multiplierChoices.append(0.004)
             multiplier = 0.004 + random.choice(multiplierChoices)
             m = self.value.mainValues
             if "metallurgists" in m:
@@ -1722,7 +1735,7 @@ class Culture:
             if "agriculture" in m :
                 if t == "agriculture":
                     multiplier = multiplier*1.3
-            if "materialists" in m :
+            if "materialism" in m :
                 if t == "research":
                     multiplier = multiplier*1.1
             if "warriors" in m :
@@ -1782,6 +1795,11 @@ class Culture:
             multiplier = multiplier*(self.tech["research"]**0.3333)
             multiplier = multiplier-(self.tech[t]*0.0005)
             self.tech[t] = self.tech[t]*(multiplier+1)
+        if techTier(self.tech["weaponry"]) >= 4 and techTier(self.tech["metallurgy"]) >= 4 and techTier(self.tech["defense"]) >= 4:
+            if "mechanized" not in self.offensiveArmyTypes:
+                self.offensiveArmyTypes.append("mechanized")
+        elif techTier(self.tech["weaponry"]) >= 3 and techTier(self.tech["metallurgy"]) >= 3 and techTier(self.tech["defense"]) >= 3:
+            self.offensiveArmyTypes = CombatTools.standardArmyTypes
     def updatePops(self):
         for f in list(self.populations.keys()):
             if f in self.populations:
@@ -1789,11 +1807,11 @@ class Culture:
         if self.leader == None or self.leader.number == 0:
             pp = self.leader
             parens = []
-            if self.hereditaryRule == True:
+            if self.hereditaryRule == True and pp != None:
                 if random.random() < 0.5:
                     parens.append(pp)
                 for offspring in pp.kids:
-                    if offspring.dead == 0 and self.leader == pp:
+                    if offspring.dead == 0 and self.leader == pp and offspring.culture == self:
                         offspring.appointLeader()
             if self.leader == pp:
                 replacementLeader = self.getReplacementLeader()
@@ -1858,7 +1876,7 @@ class Culture:
         return None
     def getPossibleLeaders(self):
         eligibleLeaders = [e for e in self.getLivingPeople() if e.location != None and e.location.city != None and e.location.city.culture == self and e.number == self.leaderCount and e.culture == self]
-        possibleLeaders = [e for e in eligibleLeaders if (e.age > CombatTools.militaryAge and e in self.ministers.values() or (self.leader != None and e.importance > self.leader.importance*0.75))]
+        possibleLeaders = [e for e in eligibleLeaders if (e.age > CombatTools.militaryAge and e in self.ministers.values())]
         return possibleLeaders
     def getLeaderCount(self):
         if self.leaderCount == 1:
@@ -1880,15 +1898,15 @@ class Culture:
         if roll > 0.08+(math.sqrt(numOrgs+20)*0.08):
             objectOfOrg = None
             if random.random() > (1-(math.sqrt(len(self.deities))*0.18))+(math.sqrt(numOrgs)*0.06):
-                possibleObjects = self.deities + self.deities + [p for p in livingPops if p.profession == "priest"]
+                possibleObjects = self.deities + self.deities + [p for p in livingPops if p.profession in ["priest"]]
                 objectOfOrg = random.choice(possibleObjects)
                 tries = 0
                 while objectOfOrg in [o.object for o in self.organizations] and tries < 10:
                     objectOfOrg = random.choice(possibleObjects)
                     tries += 1
-            numMembers = random.uniform(1,math.sqrt(len(livingPops)))
+            numMembers = random.uniform(2,math.sqrt(len(livingPops)))
             numMembers = math.ceil(numMembers*math.sqrt(nonMemberRatio))
-            if numMembers == 1:
+            if numMembers <= 1:
                 return
             selectablePops = []
             for c in self.cultureCities():
@@ -1907,20 +1925,29 @@ class Culture:
                 e = Event(self.culture.myMap,a=0,kind="founding",sub=newOrg,actrs=selectedMembers)
                 e.importance += newOrg.mostImportantMember().importance*0.33
     def election(self):
+        happiness = self.happiness()
         if self.leaderCount > 1:
-            self.leader.kill((1-self.happiness())*self.leader.number)
+            self.leader.kill((1-happiness)*self.leader.number)
         else:
-            if self.happiness() < 0.5 or random.random() > 0.65:
+            if random.random() > happiness or random.random() > 0.93:
                 ll = self.leader
                 ll.title = ""
-                if random.random() > (0.3*len(self.listOfProfessions("politician"))):  # Either elect a new politician
+                politicians = self.listOfProfessions("politician")
+                if self.religiousRule == True:
+                    politicians += self.listOfProfessions("priest")
+                politicians = [p for p in politicians if p.age > 17]
+                if ll in politicians:
+                    politicians.remove(ll)
+                if random.random() > (0.3*len(politicians)) or len(politicians) == 0:  # Either elect a new politician
                     self.createLeader()
                 else:   # Or pick from politicians they already have
-                    politicians = self.listOfProfessions("politician")
-                    newleader = random.choice(politicians)
-                    newleader.travel(self.origin)
-                    newleader.demoteMinister()
-                    self.leader = newleader
+                    listOfChoices = []
+                    for p in politicians:
+                        listOfChoices += [p for i in range(math.ceil(p.importance))]
+                    newLeader = random.choice(listOfChoices)
+                    newLeader.travel(self.origin)
+                    newLeader.demoteMinister()
+                    newLeader.appointLeader()
         self.leader.title = self.leaderTitle
         ev = Event(self.myMap,a=1,kind="election",sub=self.leader,loc=self.origin)
     def getMinisterTitle(self):
@@ -1935,8 +1962,9 @@ class Culture:
     def setSociety(self):
         m = self.value.mainValues
         if ("collectivism" in m and "worship" in m and ("builders" in m or "warriors" in m) and
-            ("individualism" not in m and "materialists" not in m and "simplicity" not in m)):
+            ("individualism" not in m and "materialism" not in m and "simplicity" not in m)):
             self.hereditaryRule = True
+            self.religiousRule = True
             return "Monarchy"
         if "warriors" in m and "collectivism" in m and "worship" in m:
             self.hereditaryRule = True
@@ -1950,20 +1978,21 @@ class Culture:
             ("individualism" in m or "travelers" in m or "sailors" in m)):
             self.hereditaryRule = True
             return "Imperium"
-        if ("materialists" in m and "astrology" in m and 
+        if ("materialism" in m and "astrology" in m and 
             ("superstition" not in m or "worship" not in m)):
             return "Astronomers"
-        if ("individualism" in m and "materialists" in m and ("superstition" not in m and "shamans" not in m)):
+        if ("individualism" in m and "materialism" in m and ("superstition" not in m and "shamans" not in m)):
             return "Scholars"
         if "individualism" in m and "collectivism" in m and "simplicity" in m:
             return "Paleolithic tribe"
-        if "collectivism" in m and "agriculture" in m and "materialists" in m:
+        if "collectivism" in m and "agriculture" in m and "materialism" in m:
             return "Agricultural commune"
         if "collectivism" in m and "agriculture" in m and "simplicity" in m:
             return "Farming commune"
         if "worship" in m and "warriors" in m and ("superstition" in m or "collectivism" in m):
+            self.religiousRule = True
             return "Religious zealots"
-        if "builders" in m and "collectivism" in m and "materialists" in m:
+        if "builders" in m and "collectivism" in m and "materialism" in m:
             return "Socialists"
         if "metallurgists" in m and "builders" in m and "craftsmen" in m and "traders" in m:
             return "Merchant artisans"
@@ -1980,10 +2009,12 @@ class Culture:
         if (("travelers" in m or "sailors" in m) and "greed" in m and "simplicity" in m):
             return "Scavengers"
         if "shamans" in m and "warriors" in m and ("astrology" in m or "superstition" in m or "worship" in m):
+            self.religiousRule = True
             return "Shamanistic warriors"
         if "travelers" in m and "simplicity" in m and "individualism" in m:
             return "Hunter-gatherer tribe"
         if "astrology" in m and "superstition" in m and "worship" in m:
+            self.religiousRule = True
             return "Religious sovereignty"
         if "warriors" in m and "collectivism" in m and ("travelers" in m or "sailors" in m):
             return "Revolutionary commune"
@@ -1992,8 +2023,9 @@ class Culture:
             return "Syndicalists"
         if ("shamans" in m and ("naturalism" in m or "astrology" in m or "simplicity") and 
             "superstition" in m):
+            self.religiousRule = True
             return "Shamanic tribe"
-        if "metallurgists" in m and "builders" in m and "craftsmen" in m and "materialists" in m:
+        if "metallurgists" in m and "builders" in m and "craftsmen" in m and "materialism" in m:
             return "Cooperative artisans"
         if "greed" in m and "sailors" in m and "warriors" in m:
             return "Pirates"
@@ -2003,9 +2035,10 @@ class Culture:
             return "Social democracy"
         if "builders" in m and "agriculture" in m and "traders" in m:
             return "Mercantile folk"
-        if "materialists" in m and "metallurgists" in m and ("craftsmen" in m or "builders" in m):
+        if "materialism" in m and "metallurgists" in m and ("craftsmen" in m or "builders" in m):
             return "Blacksmiths"
         if "collectivism" in m and "worship" in m:
+            self.religiousRule = True
             return "Religious collective"
         if "traders" in m and "collectivism" in m:
             return "Co-operative"
@@ -2014,12 +2047,14 @@ class Culture:
         if "travelers" in m and "simplicity" in m and ("metallurgists" in m or "craftsmen" in m or "builders" in m):
             return "Nomadic artisans"
         if "agriculture" in m and "worship" in m:
+            self.religiousRule = True
             return "Religious agriculturalists"
         if ("travelers" in m or "sailors" in m) and ("traders" in m or "greed" in m) and "individualism" in m:
             return "Independent merchants"
         if (("astrology" in m and "superstition" in m) or 
             ("superstition" in m and "worship" in m) or
             ("woshippers" in m and "astrology" in m)):
+            self.religiousRule = True
             return "Religious sovereignty"
         if "travelers" in m and "simplicity" and ("naturalism" in m or "superstition" in m or "astrology" in m or "shamans" in m):
             return "Nomadic tribe"
@@ -2030,6 +2065,7 @@ class Culture:
         if "shamans" in m:
             return "Shamans"
         if "worship" in m and "superstition" in m:
+            self.religiousRule = True
             return "Religious sovereignty"
         if "traders" in m and "greed" in m:
             return "Capitalists"
@@ -2198,7 +2234,10 @@ class Culture:
             self.ppp = "person"
         else:
             self.ppp = "group"
-        self.leader = Population(self,t=self.leaderTitle,i=random.randint(7,31),p=self.getLeaderCount(),kind=self.ppp,node=self.origin,prf="politician",pars=parens)
+        profession = "politician"
+        if self.religiousRule == True:
+            profession = random.choice(["politician","priest","priest"])
+        self.leader = Population(self,t=self.leaderTitle,i=random.randint(7,31),p=self.getLeaderCount(),kind=self.ppp,node=self.origin,prf=profession,pars=parens)
     def reformSociety(self,newSociety):
         self.oldSociety = self.society
         e = Event(m=self.myMap,a=0,kind="reformation",sub=self,loc=self.origin)
@@ -2235,7 +2274,7 @@ class Culture:
         if "naturalism" in m:
             t = random.randint(0,1)
             tiers += t
-        if "materialists" in m:
+        if "materialism" in m:
             t = -1
             tiers += t
         if "simplicity" in m:
@@ -2555,6 +2594,73 @@ class Culture:
         plotImg.save(fileName,"GIF")
         return fileName
 
+class Illness:
+    def __init__(self,n=None,p=[]):
+        self.myMap = None
+        if n != None:
+            self.myMap = n.myMap
+        else:
+            self.myMap = p[0].culture.myMap
+        self.tt = "illness"
+        self.origin = n
+        self.infected = []
+        self.cities = {}
+        for pop in p:
+            self.infect(pop)
+        if self.origin.city != None:
+            self.cities[self.origin.city.name] = random.randint(3,min(self.origin.city.population,12))
+        self.name = self.genName()
+        self.name = string.capwords(self.name)
+        self.infectivity = random.uniform(1,2)
+        self.mortality = random.uniform(0.1,0.9)
+        self.mortality = self.mortality**2
+        self.length = random.randint(1,10)
+    def genName(self):
+        suffix = synonym("illness")
+        prefix = ""
+        if self.origin == None and self.infected != []:
+            culture = self.infected[0].culture
+        elif self.origin != None:
+            culture = self.origin.culture
+            if self.origin != None and self.origin.city != None and random.random() > 0.7:
+                prefix = self.origin.city.name
+            elif culture == None or random.random() > 0.5:
+                biome = self.origin.biome
+                if random.random() > 0.333 and biome != "ruins":
+                    wildlife = random.choice(self.myMap.wildlife[biome])
+                    prefix = random.choice(wildlife)
+                else:
+                    prefix = biome
+                    if biome == "tropical forest":
+                        prefix = "tropical"
+                    if biome == "boreal forest":
+                        prefix = "boreal"
+                    if biome == "mountains":
+                        prefix = "mountain"
+            if prefix == "" and len(list(self.origin.region.culturalNames.values())) > 0:
+                if random.random() > 0.5:
+                    prefix = random.choice(list(self.origin.region.culturalNames.values()))
+        if prefix == "":
+            if random.random() < 0.13:
+                prefix = culture.name
+            else:
+                prefix = culture.language.genName()
+        return prefix + " " + suffix
+    def infect(self,p):
+        if p not in self.infected:
+            self.infected.append(p)
+        if self not in p.illnesses:
+            p.illnesses.append(self)
+    def cure(self,p):
+        if p in self.infected:
+            self.infected.remove(p)
+        if self in p.illnesses:
+            p.illnesses.remove(self)
+    def nameFull(self):
+        return self.name
+    def justName(self):
+        return self.name
+
 class Organization:
     def __init__(self,f=[],o=None,n=None):
         self.tt = "org"
@@ -2583,12 +2689,25 @@ class Organization:
             objectOfName = self.object.justName()
             if self.object.kind == "deity" or self.object.kind == "location" or self.object.profession == "priest":
                 typeOfName = "cult"
+            if self.object.field != None:
+                self.field = self.object.field
+                if random.random() < 0.22:
+                    objectOfName = self.object.field
+                    if random.random() < 0.3:
+                        objectOfName = self.culture.conceptualSpheres.getWeightedLinkedConcept(objectOfName)
+                        self.field = objectOfName
+                    objectOfName = synonym(objectOfName)
         elif len(self.founders) > 0:
             fields = [p.field for p in self.founders if p.field != None]
             mostCommonField = mode(fields)
             if self.field == None:
                 self.field = mostCommonField
-            objectOfName = synonym(mostCommonField)
+            objectOfName = mostCommonField
+            if random.random() < 0.33:
+                objectOfName = self.culture.conceptualSpheres.getWeightedLinkedConcept(objectOfName)
+                if self.field == None:
+                    self.field = objectOfName
+            objectOfName = synonym(objectOfName)
         if objectOfName == None or objectOfName == "":
             objectOfName = self.culture.language.genName()
         objectOfName = string.capwords(objectOfName)
@@ -2612,13 +2731,12 @@ class Organization:
         if p in self.members:
             self.members.remove(p)
         if self in p.memberOfOrganizations:
-            p.memberOfOrganizations.remove(p)
+            p.memberOfOrganizations.remove(self)
     def devote(self,o):
         self.object = o
         if o == None:
             return
         o.objectOfOrganizations.append(self)
-        self.field = o.field
     def getLivingMembers(self):
         return [p for p in self.members if p.dead == 0]
     def mostImportantMember(self):
@@ -2829,7 +2947,7 @@ class Opinion:
         if "craftsmen" in m:
             addedHostility -= 0.0001
             addedIntervention -= 0.0001
-        if "materialists" in m:
+        if "materialism" in m:
             addedHostility -= 0.0001
         if "builders" in m:
             addedHostility -= 0.0001
@@ -2876,7 +2994,7 @@ class Opinion:
         if "superstition" in m:
             addedHostility += 0.0001
             addedIntervention -= 0.0001
-        if "materialists" in m:
+        if "materialism" in m:
             addedHostility -= 0.0001
         if "craftsmen" in m:
             addedHostility -= 0.0001
@@ -2890,7 +3008,7 @@ class Opinion:
             if "worship" not in otherM and "superstition" not in otherM:
                 addedHostility += 0.0001
                 addedIntervention += 0.0001
-            if "materialists" in otherM:
+            if "materialism" in otherM:
                 addedHostility += 0.0002
         if self.culture.society == "Nation-State":
             addedHostility -= 0.0001
@@ -3027,23 +3145,23 @@ class Opinion:
         enemiesTheyLike = len(list(set(enemyCultures) & set(theirFriendlyCultures)))
         warTargetsTheyLike = len(list(set(atWarCultures) & set(theirFriendlyCultures)))
         warTargetsTheyLove = len(list(set(atWarCultures) & set(theirAlliedCultures)))
-        addedHostility += 0.04*alliesTheyHate
+        addedHostility += 0.06*alliesTheyHate
         addedIntervention += 0.008*alliesTheyHate
-        addedHostility += 0.01*alliesTheyDislike
+        addedHostility += 0.015*alliesTheyDislike
         addedHostility += 0.001*friendsTheyDislike
         addedHostility += 0.001*enemiesTheyLike
-        addedHostility += 0.01*warTargetsTheyLike
-        addedHostility += 0.04*warTargetsTheyLove
+        addedHostility += 0.015*warTargetsTheyLike
+        addedHostility += 0.06*warTargetsTheyLove
         addedIntervention += 0.008*warTargetsTheyLove
         #
         # Update opinion values
         self.addStatus([addedHostility,0,addedIntervention])
-        myStrengthEstimate = self.culture.strength*random.uniform(0.95,1.05)
-        otherStrengthEstimate = self.other.strength*random.uniform(0.8,1.2)
+        myStrengthEstimate = abs(self.culture.strength*random.uniform(0.95,1.05))
+        otherStrengthEstimate = abs(self.other.strength*random.uniform(0.8,1.2))
         if myStrengthEstimate < otherStrengthEstimate:
-            self.status[1] = -(1-(1/(otherStrengthEstimate/myStrengthEstimate)))
+            self.status[1] = -(1-(myStrengthEstimate/otherStrengthEstimate))
         else:
-            self.status[1] = (1-(1/(otherStrengthEstimate/myStrengthEstimate)))
+            self.status[1] = (1-(otherStrengthEstimate/myStrengthEstimate))
         #
         # Add active actions
         for action in actions.keys():
@@ -3293,7 +3411,7 @@ class Battle:
                 outcomeIndex = round(outcomeRoll*(len(likelyOutcomes)-1))
                 entityResult = likelyOutcomes[outcomeIndex]
                 self.entityResults[e.justName()] = entityResult
-            if e.kind in ["tactician","magician"]:
+            if e.kind in ["tactician","magician","assassin"]:
                 likelyOutcomes = ["eliminated","taken prisoner","taken prisoner","unscathed","unscathed"]
                 if entityChance < 0.33:
                     likelyOutcomes = ["eliminated","eliminated","taken prisoner","taken prisoner","unscathed"]
@@ -3385,11 +3503,13 @@ class Population:
         self.inventory = []
         self.leader = None
         self.followers = []
+        self.relationships = {}
         self.culture = c
         self.originalCulture = c
         self.memberOfOrganizations = []
         self.founderOfOrganizations = []
         self.objectOfOrganizations = []
+        self.illnesses = []
         self.number = p
         self.condition = 1
         self.profession = prf
@@ -3408,9 +3528,11 @@ class Population:
             self.importance = i
         if len(self.parents) > 0:
             lst = [p.importance for p in self.parents]
-            self.importance = self.importance + (0.2*(sum(lst)/len(lst)))
+            self.importance = self.importance + (0.25*(sum(lst)/len(lst)))
             for p in self.parents:
                 p.kids.append(self)
+                self.like(p,0.33)
+                p.like(self,0.33)
         self.importance *= 1+(self.skill/2)
         self.baseImportance = self.importance
         self.measure = "tall"
@@ -3427,15 +3549,15 @@ class Population:
                            "tactician","tactician","poet","poet","playwright",
                            "playwright","composer","composer","author","author",
                            "physician","composer","author","poet","artist",
-                           "blacksmith","blacksmith","engineer","farmer","physician"]
-        self.fields = {"artist":["art","philosophy"],"philosopher":["philosophy","research","government","trade"],
-                      "researcher":["research","medicine"],"politician":["government","philosophy","trade"],
+                           "blacksmith","blacksmith","engineer","farmer","physician","assassin"]
+        self.fields = {"artist":["art","philosophy"],"philosopher":["philosophy","research","government","trade","diplomacy"],
+                      "researcher":["research","medicine"],"politician":["government","trade","diplomacy"],
                       "engineer":["production","metallurgy","defense","weaponry"],"tactician":["weaponry","defense"],
                       "physician":["medicine"],"farmer":["agriculture"],"blacksmith":["metallurgy","production"],
                       "craftsman":["production","trade"],"roadbuilder":["transportation"],
-                      "explorer":["transportation","trade"],"magician":["magic"],
-                      "priest":["philosophy","magic"],"poet":["art"],"author":["art","philosophy"],
-                      "composer":["art"],"playwright":["art"]}
+                      "explorer":["transportation","trade","diplomacy"],"magician":["magic"],
+                      "priest":["philosophy","magic"],"poet":["art"],"author":["art","philosophy","diplomacy"],
+                      "composer":["art"],"playwright":["art"],"assassin":["weaponry"]}
         if (prf == None and (self.kind == "group" or self.kind == "person")):
             #
             if len(self.culture.deities) <= 1:
@@ -3444,6 +3566,8 @@ class Population:
             if len(self.culture.deities) > 2:
                 self.professions.extend(["priest","priest"])
             if len(self.culture.deities) > 5:
+                self.professions.extend(["priest","priest","priest","priest"])
+            if self.culture.religiousRule == True:
                 self.professions.extend(["priest","priest","priest","priest"])
             societyType = self.culture.society
             societyType = societyType.lower()
@@ -3465,7 +3589,7 @@ class Population:
                 self.professions.extend(["tactician","tactician","tactician","tactician","tactician"])
             #
             for activeWar in self.culture.activeWars:
-                self.professions.extend(["tactician","tactician","tactician"])
+                self.professions.extend(["tactician","tactician","tactician","assassin","assassin"])
             self.profession = random.choice(self.professions)
         self.field = None
         if self.profession != None:
@@ -3495,20 +3619,19 @@ class Population:
             self.age = random.randint(20,50)
         else:
             self.age = a
+        self.gender = random.choice([1,2])
+        if self.kind == "person":
+            self.gender = random.choice(self.culture.genderSpread)
+        if self.kind in ["army","fleet","group","location"]:
+            self.gender = 0
+        self.title = ""
         if t != "":
-            self.title = t + " "
-        else:
-            self.title = t
+            self.setTitle(t)
         self.fullName = self.nameFull()
         self.culture.populations[self.name] = self
         self.pronouns = ["it","he","she","they"]
         self.possessive = ["its","his","her","their"]
         self.toBe = ["is","is","is","are"]
-        self.gender = random.choice([1,2])
-        if self.kind == "person":
-            self.gender = random.choice(self.culture.genderSpread)
-        if self.kind == "group" or self.kind in ["army","fleet"]:
-            self.gender = 0
         self.description = ""
         self.location = None
         if node != None:
@@ -3525,7 +3648,7 @@ class Population:
         self.dead = 0
         if self.kind not in ["army","deity","beast","location","group","fleet"]:
             e = Event(m=self.culture.myMap,a=self.age,kind="birth",sub=self,actrs=self.parents,loc=self.location)
-            e.importance = self.importance*random.uniform(0.6,2)
+            e.importance = self.importance*random.uniform(0.4,1.2)
             self.birthEvent = e
         self.works = []
         self.units = CombatTools.armyTypes
@@ -3646,6 +3769,30 @@ class Population:
         self.skill = 1
         if random.random() < 0.36:
             newMagic = Magic(self,n=True)
+    def giftAwayItem(self,item,keep=True):
+        if item not in self.inventory:
+            return -1
+        giveToChoices = []
+        for e in [i for i in self.location.entities if i.kind in ["person","group"]]:
+            if e in self.parents or e in self.kids:
+                giveToChoices.append(e)
+            elif e in self.relationships.keys():
+                chanceToGive = self.relationships[e]
+                if random.random() < chanceToGive:
+                    giveToChoices.append(e)
+        if len(giveToChoices) == 0:
+            if keep == True:
+                return -1
+            self.abandonItem(item)
+            return -1
+        giveTo = random.choice(giveToChoices)
+        self.giveItem(giveTo,item)
+        self.like(giveTo,0.1)
+        giveTo.like(self,0.15)
+        return 1
+    def giftAwayAllItems(self):
+        for n in range(len(self.inventory)):
+            self.giftAwayItem(self.inventory[0],keep=False)
     def giveItem(self,target,item):
         if item not in self.inventory:
             return -1
@@ -3864,37 +4011,71 @@ class Population:
                         or "war" in theirOpinion.activeActions or "closed borders" in theirOpinion.activeActions):
                         newBattle = Battle(n)
                         return newBattle
+    def like(self,p,amt=0.1):
+        if p == None:
+            return
+        relationship = 0
+        if p in self.relationships.keys():
+            relationship = self.relationships[p]
+        remainingDist = 1-relationship
+        relationship += amt*remainingDist
+        self.relationships[p] = relationship
+    def dislike(self,p,amt=0.1):
+        if p == None:
+            return
+        relationship = 0
+        if p in self.relationships.keys():
+            relationship = self.relationships[p]
+        remainingDist = abs(-1-relationship)
+        relationship -= amt*remainingDist
+        self.relationships[p] = relationship
     def manageOrgs(self):
         if self.dead == 1 or self.location == None:
             return
         if self.kind != "person" and self.culture.leader != self:
             return
+        myOrgCount = len(self.memberOfOrganizations)
         # Increase my own importance and skill depending on the importance and skill of people in the org
         for o in self.memberOfOrganizations:
             mostImportantMember = o.mostImportantMember()
+            livingMembers = o.getLivingMembers()
             if mostImportantMember == self:
-                self.importance *= 1+(len(o.getLivingMembers())*0.001)
+                self.importance *= 1+(len(livingMembers)*0.001)
             else:
-                self.importance *= 1.002
-            skills = [m.skill for m in o.getLivingMembers()]
+                self.importance *= 1.001
+            skills = [m.skill for m in livingMembers]
             maxSkill = max(skills)
             if maxSkill > self.skill:
                 self.skill *= 1.001
-            if o.object != None and o.object.importance < 80:
-                o.object.importance *= 1.001
+            if o.object != None:
+                self.like(o.object,0.02)
+                if o.object.importance < 85:
+                    o.object.importance *= 1.001
+                    if self.importance > o.object.importance:
+                        o.object.importance *= 1.001
+            for p in livingMembers:
+                self.like(p,0.01)
+        # Choose to possibly leave an org
+        leaveOrg = None
+        for o in self.memberOfOrganizations:
+            threshold = 1-(myOrgCount*0.0017)
+            if random.random() > threshold:
+                leaveOrg = o
+        if leaveOrg != None:
+            leaveOrg.removeMember(self)
+        # Choose to possibly join an org
         roll = random.random()
-        if len(self.memberOfOrganizations) == 0:
+        if myOrgCount == 0:
             if roll > 0.5:
                 return
-        elif len(self.memberOfOrganizations) == 1:
-            if roll > 0.1:
+        elif myOrgCount == 1:
+            if roll > 0.12:
                 return
-        elif len(self.memberOfOrganizations) == 2:
-            if roll > 0.02:
+        elif myOrgCount == 2:
+            if roll > 0.03:
                 return
         else:
             return
-        # Choose from possible orgs to join
         orgsToChooseFrom = []
         for p in self.location.entities:
             orgsToChooseFrom += p.memberOfOrganizations
@@ -3919,6 +4100,18 @@ class Population:
                 return
     def maxImportance(self):
         return max(10*math.sqrt(self.baseImportance),self.baseImportance)
+    def setTitle(self,t):
+        if t.lower() == "monarch":
+            if self.gender == 1:
+                t = "King"
+            if self.gender == 2:
+                t = "Queen"
+        elif t.lower() == "emperor":
+            if self.gender == 2:
+                t = "Empress"
+        if t[-1] != " ":
+            t += " "
+        self.title = t
     def agePop(self,scl):
         self.age += scl
         if self.importance < 1:
@@ -3932,6 +4125,10 @@ class Population:
         self.skill = clamp(self.skill*random.uniform(1.002,1.009),0,1)
         self.offspring()
         self.manageOrgs()
+        numItems = len(self.inventory)
+        if random.random() > 0.98 and numItems> 0:
+            itemIndex = random.randint(0,numItems-1)
+            self.giftAwayItem(self.inventory[itemIndex],keep=True)
         myCompetency = self.getCompetency()
         if self.qualifiesForMinister() == True:
             ministerTitle = self.getMinisterTitle()
@@ -3939,14 +4136,49 @@ class Population:
                 rollForAppointment = random.random()+(self.importance*0.01)
                 if rollForAppointment > 0.8 and random.random() < 0.4:
                     self.appointMinister()
-        if (self.age > self.culture.oldAge or random.random() > 0.99) and (self.immortal == 0 or self.kind == "group") and (self.number > 0):
-            if random.random() < (0.1*self.number) or self.number == 1:
+        terminal = 0
+        lethality = random.random()
+        medicineStrength = self.culture.tech["medicine"]
+        if self.location != None and self.location.city != None:
+            medicineStrength = self.location.city.culture.tech["medicine"]
+        if self.location != None and self.location.city != None:
+            illnessesHere = [i for i in self.location.myMap.illnesses if self.location.city.name in i.cities.keys()]
+            for i in illnessesHere:
+                proportion = i.cities[self.location.city.name]/self.location.city.population
+                if random.random()/i.infectivity < proportion/medicineStrength:
+                    i.infect(self)
+        currentIllnesses = self.illnesses.copy()
+        for i in currentIllnesses:
+            if self.location != None:
+                if self.location.city != None and self.location.city.name not in i.cities.keys():
+                    i.cities[self.location.city.name] = random.randint(1,4)
+                possibleReceivers = [a for a in self.location.entities if a.dead == 0 and a not in i.infected]
+                for u in possibleReceivers:
+                    transmission = (i.infectivity-1)/(len(possibleReceivers)+2)
+                    if random.random() < transmission:
+                        i.infect(u)
+            adjustedCurability = (1/i.length)
+            cureChance = random.random()/math.sqrt(medicineStrength)
+            if cureChance < adjustedCurability:
+                i.cure(self)
+        for i in self.illnesses:
+            adjustedMortality = i.mortality/math.sqrt(medicineStrength)
+            if lethality < adjustedMortality:
+                terminal += 1
+        if (self.age > self.culture.oldAge or random.random() > 0.994 or terminal >= 1) and (self.immortal == 0 or self.kind == "group" or (self.kind in ["army","fleet"] and terminal >= 1)) and (self.number > 0):
+            if random.random() < (0.1*self.number) or self.number == 1 or terminal >= 1:
                 roll = self.number*0.9*(random.random())
                 if self.number > 1:
                     self.killedBy = []
                     self.number = math.ceil(roll)
+                    if terminal >= 1 and self.number < 4:
+                        self.killedBy = []
+                        self.number = 0
                 else:
                     if roll < 0.2:
+                        self.killedBy = []
+                        self.number = 0
+                    if terminal >= 1:
                         self.killedBy = []
                         self.number = 0
         if self.number == 0:
@@ -3971,6 +4203,9 @@ class Population:
                     multiplier = 1+(leaderSkill**2)
                 self.power[0] *= multiplier
                 self.power[1] *= multiplier
+            if len(self.illnesses) > 0:
+                self.power[0] *= 0.5
+                self.power[1] *= 0.5
             self.power[0] = math.floor(self.power[0])
             self.power[1] = math.floor(self.power[1])
         if self.path != None and self.location != None:
@@ -4013,13 +4248,17 @@ class Population:
         del self.culture.populations[self.name]
     def die(self,createEvent=True):
         actors = self.killedBy
-        self.abandonAllItems()
+        if len(self.illnesses) > 0:
+            actors += self.illnesses
+        self.giftAwayAllItems()
+        self.abandonAllItems();
         if self in self.culture.ministers.values():
             self.demoteMinister(retainTitle=True)
         if createEvent == True:
             if self.kind in ["group","army","fleet"]:
                 deathKind = "disbanding"
-                ii = self.importance*0.8
+                ii = self.importance*0.7
+                self.power = [0,0]
             else:
                 deathKind = "death"
                 ii = ((self.importance*(self.culture.oldAge/self.age))+self.importance)/2
@@ -4196,6 +4435,8 @@ class Population:
             potentialPartner = self.getPartner()
             if potentialPartner != None:
                 parentsList.append(potentialPartner)
+                self.like(potentialPartner,0.25)
+                potentialPartner.like(self,0.2)
             childCulture = self.culture
             if self.location.city != None:
                 childCulture = self.location.culture
@@ -4296,7 +4537,7 @@ class Population:
                 fff = self.field
             else:
                 fff = self.culture.conceptualSpheres.getWeightedLinkedConcept(self.field)
-        w = Item(k=kind,c=self.culture,f=fff,s=subj,i=self.importance*random.uniform(0.4,1.8),cr=self)
+        w = Item(k=kind,c=self.culture,f=fff,s=subj,i=self.importance*random.uniform(0.4,1.7),cr=self)
         e = Event(m=self.culture.myMap,a=-1,kind="creation",sub=w,actrs=[self],loc=self.location)
         e.importance = w.importance/2
         w.creationEvent = e
@@ -4331,6 +4572,7 @@ class Population:
             if retainTitle == False:
                 self.title = ""
     def appointMinister(self):
+        self.like(self.culture.leader,0.12)
         ministerTitle = self.getMinisterTitle()
         if ministerTitle in self.culture.ministers.keys() and self.culture.ministers[ministerTitle] != self:
             self.culture.ministers[ministerTitle].demoteMinister()
@@ -4339,7 +4581,7 @@ class Population:
     def appointLeader(self):
         self.demoteMinister()
         self.culture.leader = self
-        self.title = self.culture.leaderTitle
+        self.setTitle(self.culture.leaderTitle)
     def getCommittedWar(self):
         for war in self.culture.activeWars:
             if self in war.delegatedArmies:
@@ -4352,7 +4594,7 @@ class Population:
         applicableFields = {"research":"education","weaponry":"war","defense":"war",
                             "art":"culture","medicine":"health","government":"state",
                             "production":"production","agriculture":"agriculture","trade":"trade",
-                            "philosophy":"education","magic":"magic","metallurgy":"production"}
+                            "philosophy":"education","magic":"magic","metallurgy":"production","diplomacy":"diplomacy"}
         ministerTitle = self.culture.getMinisterTitle()
         if self.field not in applicableFields.keys():
             ministerTitle = "Deputy " + ministerTitle
@@ -4417,8 +4659,6 @@ class Population:
         if self.kind == "deity":
             s += "deity of "
             s += synonym(self.associations[0],seedNum(self.name[0]))
-            if self.associations[0] == "mountains":
-                s += "s"
             s += " from the " + self.culture.name + " culture"
         if self.kind == "person":
             s += "person from the "
@@ -4562,6 +4802,14 @@ class Population:
         else:
             s += "legendary"
         s += ".\n"
+        for i in self.illnesses:
+            if self.gender == 3 or self.kind in ["group","army","fleet"]:
+                s += "They have "
+            else:
+                s += self.pronouns[self.gender].capitalize() + " "
+                s += "has "
+            s += i.name
+            s += ".\n"
         if self.dead == 1:
             s += self.pronouns[self.gender].capitalize()+ " " + self.toBe[self.gender]
             if self.kind in ["group","army","fleet"]:
@@ -4902,6 +5150,7 @@ class Map:
         self.regions = []
         self.cities = []
         self.cultures = []
+        self.illnesses = []
         self.events = []
         self.resourceRegions = []
         self.roads = []
@@ -5368,7 +5617,7 @@ class Map:
                               "individualism":0,
                               "shamans":0,
                               "astrology":0,
-                              "materialists":0,
+                              "materialism":0,
                               "agriculture":0,
                               "collectivism":0,
                               "builders":0,
@@ -5385,7 +5634,7 @@ class Map:
                    "warriors":0.1}
         self.values["food"] = {"agriculture":-0.1,
                    "greed":-0.25,
-                   "materialists":0.55,
+                   "materialism":0.55,
                    "collectivism":0.25,
                    "simplicity":0.45,
                    "worship":-0.1,
@@ -5398,7 +5647,7 @@ class Map:
                    "superstition":0.7,
                    "greed":0.45,
                    "astrology":0.25,
-                   "materialists":-0.15,
+                   "materialism":-0.15,
                    "shamans":0.15,
                    "individualism":-0.1,
                    "warriors":0.75,
@@ -5410,7 +5659,7 @@ class Map:
                    "astrology":0.15,
                    "builders":-0.3,
                    "simplicity":0.4,
-                   "materialists":-0.15,
+                   "materialism":-0.15,
                    "individualism":0.85,
                    "naturalism":0.2,
                    "collectivism":-0.2,
@@ -5444,7 +5693,7 @@ class Map:
                    "individualism":0.15,
                    "astrology":-0.2,
                    "collectivism":0.4,
-                   "materialists":-0.1,
+                   "materialism":-0.1,
                    "warriors":0.25,
                    "builders":0.25,
                    "greed":0.1,
@@ -5464,12 +5713,12 @@ class Map:
                    "superstition":0.3,
                    "worship":0.3,
                    "individualism":0.15,
-                   "materialists":-0.15,
+                   "materialism":-0.15,
                    "shamans":0.05}
         self.values["earth"] = {"metallurgists":1.1,
                    "craftsmen":0.9,
                    "traders":0.45,
-                   "materialists":0.75,
+                   "materialism":0.75,
                    "agriculture":0.25,
                    "collectivism":0.4,
                    "builders":0.65,
@@ -5481,7 +5730,7 @@ class Map:
                    "astrology":-0.2}
         self.values["fields"] = {"agriculture":0.75,
                    "builders":0.3,
-                   "materialists":0.5,
+                   "materialism":0.5,
                    "naturalism":0.35,
                    "superstition":-0.2,
                    "simplicity":-0.3,
@@ -5495,14 +5744,14 @@ class Map:
                    "travelers":0.25,
                    "simplicity":0.75,
                    "individualism":0.6,
-                   "materialists":-0.2,
+                   "materialism":-0.2,
                    "warriors":0.5,
                    "builders":-0.1}
         self.values["ice"] = {"superstition":0.3,
                    "simplicity":-0.4,
                    "individualism":-0.4,
                    "travelers":-0.45,
-                   "materialists":0.4,
+                   "materialism":0.4,
                    "sailors":0.15,
                    "shamans":0.35,
                    "greed":0.35,
@@ -5518,7 +5767,7 @@ class Map:
                    "simplicity":-0.3,
                    "builders":0.4,
                    "greed":0.65,
-                   "materialists":-0.25,
+                   "materialism":-0.25,
                    "warriors":0.9,
                    "astrology":0.2}
         self.values["death"] = {"individualism":0.15,
@@ -5528,7 +5777,7 @@ class Map:
                    "travelers":0.1,
                    "builders":-0.1,
                    "simplicity":-0.1,
-                   "materialists":0.2}
+                   "materialism":0.2}
         self.values["water"] = {"sailors":1.5,
                    "simplicity":0.3,
                    "individualism":0.65,
@@ -5725,7 +5974,7 @@ class Map:
         self.wildlife["mountains"] = [["goat","alpaca","yak"],["wolf","cougar","hawk","snake"]]
         self.wildlife["water"] = [["carp","salmon","tuna","manatee","whale","turtle","lobster","crab"]
         ,["shark","seal","squid","octopus","swordfish","dolphin"]]
-        self.wildlife["ruins"] = []
+        self.wildlife["ruins"] = [[],[]]
     def godSpheres(self):
         s0 = list(self.influences.keys())
         s1 = list(self.values.keys())
@@ -5870,6 +6119,17 @@ class Map:
         self.lbl.image = self.img
         if self.displayNo != None:
             self.displayString.set(self.nodeInfo(self.displayNo))
+    def addIllness(self):
+        originNode = random.choice([n.node for n in self.cities])
+        originPops = []
+        if random.random() > 0.5:
+            chosenCulture = random.choice(self.cultures)
+            patient = random.choice([p for p in chosenCulture.getLivingPeople() if p.dead == 0])
+            if len(patient.illnesses) < 2:
+                originNode = patient.location
+                originPops.append(patient)
+        illness = Illness(n=originNode,p=originPops)
+        self.illnesses.append(illness)
     def updateTiming(self):
         self.date += self.timeScale
         self.age += self.timeScale
@@ -5897,6 +6157,8 @@ class Map:
     def updatePops(self):
         for c in self.cultures:
             c.updatePops()
+        if random.random() > 0.8:
+            self.addIllness()
     def updateEvents(self):
         for e in self.events:
             e.ageEvent()
@@ -5955,7 +6217,7 @@ class Map:
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "SteelBlue1"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-        for g in e.actors:
+        for g in [a for a in e.actors if a.tt != "illness"]:
             s = " "+g.justName()+" "
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = g: self.popInfo(d))
@@ -6097,7 +6359,11 @@ class Map:
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
         if p.deathEvent != None:
             g = p.deathEvent
-            bText = "Death (" + str(g.age) + " years ago)"
+            bText = " (" + str(g.age) + " years ago)"
+            if g.kind == "disbanding":
+                bText = "Disbanded" + bText
+            else:
+                bText = "Death" + bText
             b1 = Button(self.infoGui,text=bText)
             b1.configure(command = lambda self=self, d = g: self.eventInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
@@ -6262,11 +6528,13 @@ class Map:
             b1.configure(command = lambda self=self, d = i: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=X)
             c1 = "SteelBlue2"
-            if i in o.founders:
-                c1 = "SlateBlue1"
-            if i == o.object:
-                c1 = "light goldenrod"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+            if i in o.founders:
+                c2 = "SlateBlue1"
+                b1.config(bg=c2,activebackground=c2,activeforeground=c2)
+            if i == o.object:
+                c3 = "light goldenrod"
+                b1.config(bg=c3,activebackground=c3,activeforeground=c3)
             count += 1
             if count == rows:
                 count = 0
@@ -6609,9 +6877,27 @@ world.influences()
 world.values()
 world.technologySetup()
 world.godSpheres()
-world.scatterCities(random.randint(8,16))
-world.scatterBeasts(random.randint(8,24))
+world.biomeWildlife()
+world.scatterCities(random.randint(8,15))
+world.scatterBeasts(random.randint(9,22))
 world.initOpinions()
 print("Drawing map...")
 root = Tk()
 world.drawReal(root)
+
+# Test code for the use of 3d noise
+"""
+testWidth = 128
+testNoise = noiseField3d(testWidth)
+octaves = 4
+layers = 64
+for zz in range(layers):
+    testDraw = Image.new("RGB",(testWidth,testWidth),"white")
+    drawer = ImageDraw.Draw(testDraw)
+    for xx in range(testWidth):
+        for yy in range(testWidth):
+            magnitude = testNoise.turbulence(xx,yy,zz,2**octaves)
+            colorIntensity = math.floor(255*magnitude)
+            drawer.point([(xx,yy)],fill=(colorIntensity,colorIntensity,colorIntensity))
+    testDraw.save("./test3dnoise"+str(zz)+".gif","GIF")
+"""

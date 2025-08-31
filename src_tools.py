@@ -140,7 +140,7 @@ class CombatTools:
                     "siege":["guard infantry","artillery"],
                     "artillery":["guard infantry","assault infantry","ranged infantry","artillery","mechanized"],
                     "ranged infantry":["assault infantry","cavalry"],
-                    "mechanized":["siege","cavalry","artillery","assault infantry"],
+                    "mechanized":["siege","cavalry","artillery","assault infantry","ranged infantry"],
                     "cavalry":["assault infantry","artillery","siege","cavalry"],
                     }
     # How much more offensive power armies have against army types they're strong against
@@ -208,13 +208,13 @@ def synonym(x,seed=0,exclusive=0):
     s["boreal forest"] = ["boreal forest","woods","wood","taiga"]
     s["carnivores"] = ["carnivores","predators","hunters"]
     s["herbivores"] = ["herbivores","livestock","cattle","prey"]
-    s["fear"] = ["fear","terror","dread","anxiety","hatred"]
+    s["fear"] = ["fear","terror","dread","hatred"]
     s["warriors"] = ["warriors","fighters","soldiers"]
     s["traders"] = ["traders","merchants","sellers","brokers"]
     s["naturalism"] = ["naturalism","naturalists","herbalism","gardeners","herbalists","gardening","druids"]
     s["travelers"] = ["travelers","wanderers","nomads","migrants","itinerants","wayfarers"]
     s["sailors"] = ["sailors","mariners","wayfarers","navigation","seafaring"]
-    s["swimming"] = ["swimming","sailing","navigating","diving","cruising"]
+    s["swimming"] = ["swimming","sailing","navigating","cruising"]
     s["agriculture"] = ["agriculture","farming","cultivation","harvest"]
     s["camp"] = ["bivouac","camp","camp","encampment","campsite"]
     s["village"] = ["village","hamlet"]
@@ -234,6 +234,7 @@ def synonym(x,seed=0,exclusive=0):
     s["sky"] = ["sky","stars","heavens","clouds","cosmos"]
     s["superstition"] = ["superstition","religion","faith","theology","paranormal"]
     s["collectivism"] = ["collectivism","community","cooperation","communism","socialism"]
+    s["materialism"] = ["materialism","reason","empiricism","realism"]
     s["worship"] = ["worship","religion","monks","priests","prayer","mythology","clergy"]
     s["individualism"] = ["individualism","liberation","liberty","anarchism","freedom"]
     s["large"] = ["large","sizable","grand","great"]
@@ -259,9 +260,9 @@ def synonym(x,seed=0,exclusive=0):
     s["paint"] = ["paint","oil","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
     s["weaponry"] = ["weaponry","combat","blades","war","battle","assault","conquest"]
     s["defense"] = ["defense","combat","armor","war","battle","fortification"]
-    s["production"] = ["production","industry","manufacturing"]
-    s["mining"] = ["mining","minerals","mountains","metals","forging","excavation"]
-    s["metallurgy"] = ["minerals","mountains","metals","forging","smithing","smelting"]
+    s["production"] = ["production","industry","manufacturing","labor"]
+    s["mining"] = ["mining","minerals","mountains","metal","forging","excavation"]
+    s["metallurgy"] = ["minerals","mountains","metals","forging","smithing","smelting","industry","manufacturing","labor"]
     s["government"] = ["government","bureaucracy","administration","authority","states","the state"]
     s["transportation"] = ["transportation","sailing","travel","rail","roads","infrastructure","roadbuilding"]
     s["research"] = ["research","science","experiments","physics","mathematics","language","study"]
@@ -278,7 +279,7 @@ def synonym(x,seed=0,exclusive=0):
     s["fleet"] = ["fleet","wing","detachment","flotilla","battle group"]
     s["about"] = ["about","dealing with","related to","explaining","questioning",
      "investigating","on","concerning","relating to","challenging","exploring","pondering"]
-    s["water"] = ["water","moisture","rain","rainfall","irrigation","fluids","humidity"]
+    s["water"] = ["water","moisture","rain","rainfall","irrigation","humidity"]
     s["magic"] = ["magic","witchcraft","wizardry","miracles","sorcery","alchemy","divination","voodoo","thaumaturgy"]
     s["church"] = ["church","cathedral","parish","chapel","temple","mosque","basilica","shrine","sanctuary","abbey"]
     s["cathedral"] = ["cathedral","basilica","grand mosque","archbasilica","grand cathedral","shrine","abbey"]
@@ -300,8 +301,12 @@ def synonym(x,seed=0,exclusive=0):
     s["state"] = ["state","government","the state"]
     s["culture"] = ["culture","the arts"]
     s["trade"] = ["trade","economy","exchange","finance"]
-    s["party"] = ["party","league","organization","advocates","followers","guild","congress","caucus","fraternity","syndicate","conference"]
+    s["party"] = ["party","league","organization","advocates","followers","guild","congress","caucus","fraternity","syndicate","conference","association","center"]
     s["cult"] = ["cult","church","clergy","worshippers","followers","priests","disciples","apostles","devotees","prophets","evangelists"]
+    s["latitude"] = ["latitude","arctic","tropics"]
+    s["diplomacy"] = ["diplomacy","foreign affairs","foreign policy","international relations","foreign relations"]
+    s["constellations"] = ["constellations","astrology","astronomy","stars"]
+    s["illness"] = ["illness","disease","flu","fever","cough","pox","sickness"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)
@@ -318,6 +323,38 @@ def seedNum(s):
     for k in s:
         v += ord(k)
     return v
+
+class noiseField3d:
+    def __init__(self,w):
+        self.width = w
+        self.noise = np.random.rand(w,w,w)
+    def smoothNoise(self,xx,yy,zz):
+        fracX = xx % 1
+        fracY = yy % 1
+        fracZ = zz % 1
+        x1 = (math.floor(xx)+self.width) % self.width
+        y1 = (math.floor(yy)+self.width) % self.width
+        z1 = (math.floor(zz)+self.width) % self.width
+        x2 = (x1+self.width-1) % self.width
+        y2 = (y1+self.width-1) % self.width
+        z2 = (z1+self.width-1) % self.width
+        tileVal = 0
+        tileVal += fracX*fracY*fracZ*self.noise[x1,y1,z1]
+        tileVal += (1-fracX)*fracY*fracZ*self.noise[x2,y1,z1]
+        tileVal += fracX*(1-fracY)*fracZ*self.noise[x1,y2,z1]
+        tileVal += (1-fracX)*(1-fracY)*fracZ*self.noise[x2,y2,z1]
+        tileVal += fracX*fracY*(1-fracZ)*self.noise[x1,y1,z2]
+        tileVal += (1-fracX)*fracY*(1-fracZ)*self.noise[x2,y1,z2]
+        tileVal += fracX*(1-fracY)*(1-fracZ)*self.noise[x1,y2,z2]
+        tileVal += (1-fracX)*(1-fracY)*(1-fracZ)*self.noise[x2,y2,z2]
+        return tileVal
+    def turbulence(self,xx,yy,zz,size):
+        tileVal = 0
+        initialSize = size
+        while size >= 1:
+            tileVal += self.smoothNoise(xx/size,yy/size,zz/size)*size
+            size = size/2
+        return tileVal/(initialSize*2)
 
 class noiseMaker:
     def __init__(self,w,h):

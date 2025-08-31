@@ -112,7 +112,7 @@ class Event:
                 s += " died"
             else:
                 s += " was killed by the " + self.actors[0].nameFull()
-        if self.kind == "disbanded":
+        if self.kind == "disbanding":
             if len(self.actors) == 0:
                 s += " disbanded"
             else:
