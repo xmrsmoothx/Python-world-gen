@@ -127,13 +127,13 @@ class Tools:
 
 class CombatTools:
     endWarDistance = 1400
-    militaryAge = 19
-    warlikeSocieties = ["Pirates","Raiders"]
+    militaryAge = 17
+    warlikeSocieties = ["Privateers","Military dictatorship"]
     aggressiveSocieties = ["Imperiun","Empire","Hegemony","Monarchy",
-                                    "Religious Zealots","Revolutionary Commune",
-                                    "Shamanistic Warriors"]
+                                    "Religious zealots","Revolutionary commune",
+                                    "Shamanistic warriors"]
     battlingKinds = ["army","fleet","tactician","beast","magician"]
-    armyTypes = ["assault infantry","guard infantry","siege","artillery","ranged infantry","mechanized","cavalry","fleet","beast"]
+    armyTypes = ["assault infantry","guard infantry","siege","artillery","ranged infantry","mechanized","cavalry","navy","beast"]
     standardArmyTypes = ["assault infantry","siege","artillery","ranged infantry","cavalry"]
     rps = {"assault infantry":["artillery","siege"],
                     "guard infantry":["assault infantry","ranged infantry","cavalry"],
@@ -153,7 +153,7 @@ class CombatTools:
                             "ranged infantry":[1.25,0.75,1.4],
                             "mechanized":[1.5,1.5,3],
                             "cavalry":[1.25,1,1.8],
-                            "fleet":[10,10,4]}
+                            "navy":[10,10,4]}
     baseMilitarization = 0.08
     startingSkill = 0.4
     commandRanks = ["General","Colonel","Colonel","Commander","Commander","Commander","Captain","Captain","Captain","Captain","Captain","Captain"]
@@ -253,12 +253,13 @@ def synonym(x,seed=0,exclusive=0):
     s["bodice"] = ["bodice","breastplate","hauberk","mail","brigandine","lamellar","platemail","cuirass","coat","vest"]
     s["shield"] = ["shield","buckler","kite shield","tower shield","targe","pavise","roundshield","greatshield","small shield"]
     s["tool"] = ["tool","hammer","drill","saw","chisel","sextant","wrench","hatchet","axe","cane","brush","shovel","pickaxe"]
+    s["accessory"] = ["accessory","necklace","pendant","ring","earring","brooch","medal","monocle","chain","rosary","charm"]
     s["paper"] = ["paper","parchment","vellum","slate","papyrus","bamboo","eelskin","rawhide","sandstone"]
     s["wood"] = ["wood","oak","maple","mahogany","pine","birch","hickory","fir","ash","teak","olive","cork","balsa","pecan"]
     s["stone"] = ["stone","granite","basalt","obsidian","limestone","sandstone","slate","marble","gneiss"]
     s["metal"] = ["metal","steel","iron","bronze","brass","copper","silver","gold","titanium","aluminium","tin","nickel","electrum","platinum"]
     s["paint"] = ["paint","oil","pastel","watercolor","ink","gouache","fresco","enamel","tempera"]
-    s["weaponry"] = ["weaponry","combat","blades","war","battle","assault","conquest"]
+    s["weaponry"] = ["weaponry","combat","war","battle","assault","conquest"]
     s["defense"] = ["defense","combat","armor","war","battle","fortification"]
     s["production"] = ["production","industry","manufacturing","labor"]
     s["mining"] = ["mining","minerals","mountains","metal","forging","excavation"]
@@ -276,7 +277,7 @@ def synonym(x,seed=0,exclusive=0):
     s["guard infantry"] = ["guard infantry","garrison","sentinels","defensive brigade","guardsmen","reserve"]
     s["ranged infantry"] = ["ranged infantry","riflemen","longbowmen","slingers","rifle brigade","carabiniers"]
     s["siege"] = ["siege","siege towers","battering rams","demolitionists","blockades","sappers"]
-    s["fleet"] = ["fleet","wing","detachment","flotilla","battle group"]
+    s["navy"] = ["navy","fleet","naval wing","naval detachment","flotilla","naval battle group","sailors","seamen"]
     s["about"] = ["about","dealing with","related to","explaining","questioning",
      "investigating","on","concerning","relating to","challenging","exploring","pondering"]
     s["water"] = ["water","moisture","rain","rainfall","irrigation","humidity"]
@@ -292,9 +293,9 @@ def synonym(x,seed=0,exclusive=0):
     s["simplicity"] = ["simplicity","asceticism","minimalism","detachment"]
     s["craftsmen"] = ["craftsmen","artisans","craft","work","creation","building","forging"]
     s["builders"] = ["builders","construction","manufacturing","craftsmen","fabrication"]
-    s["ruins"] = ["ruins","wreckage"]
+    s["ruins"] = ["ruins","wreckage","crags"]
     s["temperature"] = ["temperature","heat","sunlight","warmth","thermodynamics"]
-    s["minister"] = ["minister","secretary","chancellor","director","head","premier","chair","magistrate"]
+    s["minister"] = ["minister","secretary","chancellor","director","head","premier","chair","magistrate","chamberlain"]
     s["war"] = ["war","defense","security"]
     s["health"] = ["health","medicine","healthcare"]
     s["infrastructure"] = ["infrastructure","transporation"]
@@ -307,6 +308,9 @@ def synonym(x,seed=0,exclusive=0):
     s["diplomacy"] = ["diplomacy","foreign affairs","foreign policy","international relations","foreign relations"]
     s["constellations"] = ["constellations","astrology","astronomy","stars"]
     s["illness"] = ["illness","disease","flu","fever","cough","pox","sickness"]
+    s["peak"] = ["peak","mountain","summit","ridge"]
+    s["hill"] = ["hill","bluff","cliff","ridge","knoll","hillock"]
+    s["pond"] = ["pond","lake","reservoir","lagoon"]
     syn = x
     if x in s.keys():
         ch = random.randint(0,len(s[x])-1)

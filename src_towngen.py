@@ -142,6 +142,7 @@ class Block:
         self.type = None
         self.node = None
         self.col = (0,0,0)
+        self.key = 0
     def centroid(self):
         if len(self.verts) != 0:
             xx = sum([n.x for n in self.verts])/len(self.verts)
@@ -152,6 +153,7 @@ class Block:
         self.x = xx
         self.y = yy
         self.orderccw()
+        self.key = math.floor(self.x)*math.floor(self.y)
         return [self.x,self.y]
     def blockDist(self,x,y):
         self.centroid()
@@ -172,6 +174,19 @@ class Block:
         return s
     def orderccw(self):
         self.verts.sort(key=lambda a: math.atan2(float(self.x-a.x),float(self.y-a.y)))
+    def isTownBlock(self):
+        if self.myTown.radius == 0:
+            return False
+        if self.col == Tools.waterColor:
+            return False
+        if self.blockDist(self.myTown.x,self.myTown.y) < self.myTown.radius:
+            return True
+        buffer = max(320-(self.myTown.radius*2),90)
+        if self.x < buffer or self.y < buffer or self.myTown.xDim-self.x < buffer or self.myTown.yDim-self.y < buffer:
+            return False
+        if self.key % self.myTown.buildingOccurrence == 0:
+            return True
+        return False
     def drawRoads(self,drawer):
         dCol = Tools.streetColor
         if len(self.verts) < 3:
@@ -192,7 +207,7 @@ class Block:
         dCol = self.col
         if len(self.verts) > 1:
             vts = [(p.x,p.y) for p in self.verts]
-            if self.blockDist(self.myTown.x,self.myTown.y) < self.myTown.radius and self.col != Tools.waterColor:
+            if self.isTownBlock():
                 dCol = Tools.streetColor
                 bCol = Tools.buildingColor
                 drawer.polygon(vts,bCol,dCol)
@@ -214,15 +229,22 @@ class Town:
         self.x = self.xDim/2
         self.y = self.yDim/2
         self.roadRadius = 3
+        self.radius = 0
+        self.buildingOccurrence = 97
         if self.node.city != None:
             self.population = self.node.city.population
             self.wateryNeighbors = [u for u in self.node.neighbors if u.watery() == 1]
             self.radius = math.floor(23+math.sqrt(self.population))*(1+(len(self.wateryNeighbors)/16))
             if self.node.river != None:
-                self.radius = self.radius*1.2
+                self.radius = self.radius*1.4
         else:
             self.population = 0
             self.radius = 0
+        self.lakeRadius = 0
+        if self.node.lake > 0:
+            self.lakeRadius = (self.xDim/24)*self.node.lake
+            if self.radius > 0:
+                self.radius *= 1.4
         cnt = 1024
         sd = (self.node.x*73)+(self.node.y*37)
         random.seed(sd)
@@ -282,10 +304,12 @@ class Town:
             if n.bodyWater != None:
                 s.type = "water"
                 s.drawCol = self.waterColor
-            elif self.node.elevation > n.elevation:
+            elif self.node.biome > n.biome:
                 s.drawCol = n.biomeColor
                 #s.drawCol = n.myMap.biomeColors[n.biome]
                 #s.drawCol = colAvg(n.myMap.biomeColors[n.biome],self.landColor)
+            elif self.node.biome == n.biome and self.node.biome == "mountains" and self.node.biomeColor == self.myMap.biomeColors["frost"]:
+                s.drawCol = n.biomeColor
             else:
                 s.drawCol = self.landColor
             if len(n.roads) > 0:
@@ -312,6 +336,10 @@ class Town:
             for f in self.blocks:
                 if (b.sharedNeighbors(f) >= 2 and
                     b.type == "water"):
+                    f.col = self.waterColor
+        if self.lakeRadius > 0:
+            for f in self.blocks:
+                if f.blockDist(self.x,self.y) < self.lakeRadius:
                     f.col = self.waterColor
         if self.node.watery() == 1:
             for f in self.blocks:
@@ -440,7 +468,30 @@ class Town:
                         if neighbor.node in self.node.roads:
                             sharedRoad = True
                         if sharedRoad == True:
-                            drawer.line([(neighbor.x,neighbor.y),(self.x,self.y)],dCol,math.floor(self.roadRadius*2))
+                            currentBlock = self.nearestSolidBlock(self.x,self.y)
+                            roadedBlocks = [currentBlock]
+                            buffer = 80
+                            while currentBlock.x > buffer and self.xDim-currentBlock.x > buffer and currentBlock.y > buffer and self.yDim-currentBlock.y > buffer:
+                                chosenBlock = None
+                                chosenDist = 1000
+                                for blockNeighbor in currentBlock.neighbors:
+                                    if blockNeighbor.blockDist(neighbor.x,neighbor.y) < chosenDist and blockNeighbor.col != self.waterColor:
+                                        chosenBlock = blockNeighbor
+                                        chosenDist = chosenBlock.blockDist(neighbor.x,neighbor.y)
+                                if chosenBlock == None or chosenBlock.blockDist(neighbor.x,neighbor.y) > currentBlock.blockDist(neighbor.x,neighbor.y) or chosenBlock in roadedBlocks:
+                                    chosenBlock = None
+                                    chosenDist = 1000
+                                    for blockNeighbor in currentBlock.neighbors:
+                                        if blockNeighbor.blockDist(neighbor.x,neighbor.y) < chosenDist:
+                                            chosenBlock = blockNeighbor
+                                            chosenDist = chosenBlock.blockDist(neighbor.x,neighbor.y)
+                                drawCircle(drawer,currentBlock.x,currentBlock.y,self.roadRadius,dCol)
+                                drawer.line([(currentBlock.x,currentBlock.y),(chosenBlock.x,chosenBlock.y)],dCol,math.floor(self.roadRadius*2))
+                                currentBlock = chosenBlock
+                                roadedBlocks.append(currentBlock)
+                                buffer += 1
+                            drawCircle(drawer,currentBlock.x,currentBlock.y,self.roadRadius,dCol)
+                            drawer.line([(neighbor.x,neighbor.y),(currentBlock.x,currentBlock.y)],dCol,math.floor(self.roadRadius*2))
             """
             else:
                 for neighbor in self.neighborPts:
@@ -451,10 +502,10 @@ class Town:
                                 roadCenter = ((neighbor.x+otherNeighbor.x)/2,(neighbor.y+otherNeighbor.y)/2)
             """
         for k in self.blocks:
-            if k.blockDist(self.x,self.y) < self.radius and k.col != Tools.waterColor:
+            if k.isTownBlock():
                 k.drawSelf(drawer)
         for k in self.blocks:
-            if k.blockDist(self.x,self.y) < self.radius and k.col != Tools.waterColor:
+            if k.isTownBlock():
                 k.drawRoads(drawer)
         nodeStructure = self.node.structure()
         if self.node.city == None and nodeStructure != None:

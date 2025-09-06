@@ -92,13 +92,11 @@ class Item:
         self.creator = cr
         self.owner = None
         if self.creator != None:
-            self.move(self.creator.location)
-            self.creator.inventory.append(self)
-            self.owner = self.creator
+            self.creator.takeItem(self)
         self.subkind = None
         self.decoration = None
-        self.quality = random.uniform(0.1,0.3)
-        self.quality = clamp(self.quality+(self.creator.skill*random.uniform(0.75,1.1)),0.05,1)
+        self.quality = random.uniform(0.1,0.25)
+        self.quality = clamp(self.quality+(self.creator.skill*random.uniform(0.75,1)),0.05,1)
         self.importance = self.importance*(1+(self.quality/2))
         if self.kind == "piece":
             self.subkind = synonym("piece")
@@ -116,6 +114,8 @@ class Item:
                 #if self.subject.kind in ["book","story","piece","poem","song","play"]:
                 #    t = ""
                 subname = t + string.capwords(self.subject.name.replace("\"","")) + t
+            if self.subject.tt == "node":
+                subname = self.subject.shortName()
         connectorCount = 0
         connectorLimit = 5
         connectorWords = [" a "," the "," on "," about "," regarding "," relating "," of "]
@@ -181,9 +181,9 @@ class Item:
                         n = synonym(self.field)
                         if roll2 < 0.07:
                             n += " " + self.culture.language.genName()
-            if self.kind in ["weapon","helmet","bodice","shield","tool"]:
+            if self.kind in ["weapon","helmet","bodice","shield","tool","accessory"]:
                 roll = random.random()
-                if self.kind in ["tool","weapon"]:
+                if self.kind in ["tool","weapon","accessory"]:
                     self.subkind = synonym(self.kind,exclusive=1)
                 else:
                     self.subkind = synonym(self.kind)
@@ -221,6 +221,17 @@ class Item:
             if self.owner != None:
                 self.owner.inventory.remove(self)
             self.owner = None
+    def getLeadershipMultiplier(self):
+        if self.kind not in ["weapon","helmet","bodice","shield","tool","accessory"]:
+            return 1
+        multiplier = clamp(math.log10(self.importance/2),1.1,2)-1
+        multiplier = multiplier*(1+(self.quality/2))
+        if self.kind in ["tool","bodice","accessory"]:
+            multiplier *= 0.6
+        if self.kind in ["helmet","shield"]:
+            multiplier *= 0.8
+        multiplier += 1
+        return multiplier
     def generateBookCover(self):
         self.filename = "./generated/book_"+self.name+".gif"
         sd = seedNum(self.name)
@@ -382,7 +393,7 @@ class Item:
             s = s + "n " + self.subkind if self.subkind[0].lower() in vowels else s + " " + self.subkind
         else:
             s = s + "n " + self.kind if self.kind[0].lower() in vowels else s + " " + self.kind
-        if self.kind in ["weapon","helmet","bodice","shield","tool"]:
+        if self.kind in ["weapon","helmet","bodice","shield","tool","accessory"]:
             s += " created by the " + self.creator.nameFull()
         else:
             s += " by the " + self.creator.nameFull()
@@ -401,7 +412,7 @@ class Item:
         elif self.subkind in ["woodcut","longbow","shortbow","crossbow"] or self.kind in ["shield"]:
             self.material = synonym("wood",seedNum(self.name))
             s += "It is made of " + self.material
-        elif self.kind in ["weapon","helmet","bodice","tool"]:
+        elif self.kind in ["weapon","helmet","bodice","tool","accessory"]:
             self.material = synonym("metal",seed=seedNum(self.name))
             s += "It is made of " + self.material
         else:
@@ -423,8 +434,10 @@ class Item:
             s += "It is a shield "
         elif self.kind == "weapon":
             s += "It is a weapon "
-        elif self.kind == "tool":
+        elif self.kind == "tool ":
             s += "It is a tool "
+        elif self.kind == "accessory":
+            s += "It is an accessory "
         else:
             s += "It is an object "
         if self.field != None:

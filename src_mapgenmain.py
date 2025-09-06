@@ -96,12 +96,18 @@ class Node:
         self.resourceRegion = None
         self.resourceDist = 0
         self.key = 0
+        self.linkedRoads = []
         self.roads = []
         self.entities = []
         self.items = []
         self.myMap=m
         self.name = str(math.floor(xx+(yy*437)))
         self.battle = None
+        self.lake = 0
+        self.lakeName = ""
+        self.peak = 0
+        self.peakName = ""
+        self.structureName = ""
     def coords(self):
         tupleVert = (self.x,self.y)
         return tupleVert
@@ -204,6 +210,10 @@ class Node:
         self.slopeDirection()
         self.rSlope = self.slope*self.slopeDir
         return self.rSlope
+    def nearestCity(self):
+        if self.city != None:
+            return self
+        return self.myMap.nearestCity(self.x,self.y)
     def riverNext(self):
         if self.river == None:
             return None
@@ -249,14 +259,16 @@ class Node:
     def setBiome(self,sl):
         if self.elevation > Tools.mountainHeight*random.uniform(1,1.02):
                 self.biome = "mountains"
-        elif self.temp < 0.2:
+        elif self.temp < 0.11:
+            self.biome = "frost"
+        elif self.temp < 0.22:
             if self.rainfall < 0.2:
                 self.biome = "frost"
             elif self.rainfall < 0.38:
                 self.biome = "tundra"
             else:
-                self.biome = "boreal forest"
-        elif self.temp < 0.27:
+                self.biome = "frost"
+        elif self.temp < 0.28:
             if self.rainfall < 0.14:
                 self.biome = "frost"
             elif self.rainfall < 0.22:
@@ -295,18 +307,18 @@ class Node:
             else:
                 self.biome = "tropical forest"
         elif self.temp < 0.85:
-            if self.rainfall < 0.07:
+            if self.rainfall < 0.06:
                 self.biome = "desert"
-            elif self.rainfall < 0.12:
+            elif self.rainfall < 0.1:
                 self.biome = "savanna"
             else:
                 self.biome = "tropical forest"
         else:
-            if self.rainfall < 0.12:
+            if self.rainfall < 0.09:
                 self.biome = "desert"
-            elif self.rainfall < 0.2:
+            elif self.rainfall < 0.15:
                 self.biome = "savanna"
-            elif self.rainfall < 0.34:
+            elif self.rainfall < 0.3:
                 self.biome = "forest"
             else:
                 self.biome = "tropical forest"
@@ -342,6 +354,20 @@ class Node:
         if n.river != None:
             if self.culture.name not in n.river.culturalNames:
                 n.river.culturalNames[self.culture.name] = self.culture.language.genName()
+        if n.lake > 0 and n.lakeName == "":
+            if random.random() < 0.4:
+                n.lakeName = "Lake " + self.culture.language.genName()
+            else:
+                n.lakeName = self.culture.language.genName() + " " + string.capwords(synonym("pond"))
+            self.culture.landmarks.append(n)
+        if n.peak > 0 and n.peakName == "":
+            if n.peak == 1:
+                n.peakName = self.culture.language.genName() + " " + string.capwords(synonym("hill"))
+            if n.peak == 2:
+                n.peakName = self.culture.language.genName() + " " + string.capwords(synonym("peak"))
+            if n.peak == 3:
+                n.peakName = "Mount " + self.culture.language.genName()
+            self.culture.landmarks.append(n)
     def updateAllegiance(self,sealevel=0.4):
         if self.culture != None:
             chance = 1/clamp(self.allegiance,0.00001,512)
@@ -354,10 +380,12 @@ class Node:
                 roll = random.random()
                 if roll <= chance:
                     self.claim(n,sealevel)
+    def unclaimedItems(self):
+        return [i for i in self.items if i.owner == None]
     def structure(self):
         structureSeed = int(self.name)
-        possibleStructures = ["farm","inn","brothel","workshop","mine","fort","farm","farm","farm","farm","inn","mine","mill","mill"]
-        waterStructures = ["fishery","fishery","fishery","port","port","mill","mill","fort","workshop"]
+        possibleStructures = ["farm","inn","brothel","workshop","mine","fort","farm","farm","farm","farm","inn","mine","mill"]
+        waterStructures = ["fishery","fishery","fishery","port","port","port","mill","mill","fort","workshop"]
         if self.city != None:
             return None
         if self.resourceRegion == None:
@@ -367,14 +395,23 @@ class Node:
         if self.biome == "ruins":
             return None
         chanceReduction = 1
+        structureType = None
         if (self.landmass != None and self.hasWaterNeighbor() == 1) or self.river != None:
             for k in range(9+chanceReduction):
                 if k != 0 and structureSeed % k == 0 and k >= self.resourceRegion.rootCity.cityTier+chanceReduction:
-                    return waterStructures[structureSeed % len(waterStructures)]
-        for k in range(9+chanceReduction):
-            if k != 0 and structureSeed % k == 0 and k >= self.resourceRegion.rootCity.cityTier+chanceReduction:
-                return possibleStructures[structureSeed % len(possibleStructures)]
-        return None
+                    structureType = waterStructures[structureSeed % len(waterStructures)]
+        else:
+            for k in range(9+chanceReduction):
+                if k != 0 and structureSeed % k == 0 and k >= self.resourceRegion.rootCity.cityTier+chanceReduction:
+                    structureType = possibleStructures[structureSeed % len(possibleStructures)]
+        if structureType != None and self.culture != None and self.structureName == "":
+            if structureType == "fort":
+                self.structureName = "Fort " + self.culture.language.genName()
+                self.culture.landmarks.append(self)
+            if structureType == "port":
+                self.structureName = "Port " + self.culture.language.genName()
+                self.culture.landmarks.append(self)
+        return structureType
     def allItems(self):
         return self.items
     def unownedItems(self):
@@ -388,6 +425,50 @@ class Node:
         return self.selfString
     def printSelf(self):
         print(self.toString())
+    def nameFull(self):
+        if self.city != None:
+            return self.city.cType(self.city.population) + " " + self.city.name
+        return self.shortName()
+    def shortName(self):
+        if self.city != None:
+            return self.city.name
+        if self.structureName != "":
+            return self.structureName
+        if self.peakName != "":
+            return self.peakName
+        if self.lakeName != "":
+            return self.lakeName
+        if self.river != None:
+            if self.river.culturalNames == {}:
+                return "unnamed river"
+            else:
+                return self.culturalNames[self.culture.name] + " River"
+        if self.region.culturalNames == {}:
+            return "unnamed " + self.region.biome
+        else:
+            return self.region.culturalNames[self.culture.name] + " " + self.biome
+    def nodeNotes(self):
+        s = "the "
+        if self.city != None:
+            s = self.city.name + ", the " + self.city.cType(self.city.population)
+        elif self.structureName != "":
+            s = self.structureName
+        elif self.peakName != "":
+            s = self.peakName
+        elif self.lakeName != "":
+            s = self.lakeName
+        elif self.river != None:
+            if self.river.culturalNames == {}:
+                s = "An unnamed river"
+            else:
+                s += self.culturalNames[self.culture.name] + " River"
+        elif self.region.culturalNames == {}:
+            s = "An unnamed " + self.region.biome
+        else:
+            s += self.region.culturalNames[self.culture.name] + " " + self.biome
+        if self.culture != None:
+            s += ", in the " + self.culture.name + " " + self.culture.title+"."
+        return s
     def drawPoint(self,drawer,radius,color):
         drawCircle(drawer,self.x,self.y,radius,color)
     def drawElevation(self,drawer,pts=0):
@@ -435,11 +516,12 @@ class Node:
         pts = [(xx+2,yy-4),(xx,yy-4),(xx-2,yy-4),(xx,yy-1),(xx,yy)]
         drawer.point(pts,fill=out)
     def drawSelf(self,drawer):
-        if self.structure() == None:
+        structureType = self.structure()
+        if structureType == None:
             return
         col = self.resourceRegion.culture.bannerColor
         out = (0,0,0)
-        if self.structure() == "fort":
+        if structureType == "fort":
             self.drawFort(drawer,self.x,self.y,col,out)
     def drawTownGen(self):
         self.townGen = Town(self,self.myMap,self.name)
@@ -592,6 +674,9 @@ class River:
                 j = length
             else:
                 self.addNode(choice)
+                if j > 4:
+                    if random.random() < 0.14:
+                        choice.lake = random.randint(3,6)
             j+=1
             current = choice
         if random.random() < 0.7 and len(self.nodes) > 3:
@@ -621,11 +706,27 @@ class River:
             n = self.nodes[i]
             n1 = self.nodes[i+1]
             scale = xDim/2
-            w = clamp((1/n.slope)/scale,0.5,1.5)
-            w1 = clamp((1/n1.slope)/scale,0.5,1.5)
+            w = clamp((1/n.slope)/scale,0.5,1.1)
+            w1 = clamp((1/n1.slope)/scale,0.5,1.1)
             drawCircle(drawer,n.x,n.y,w,dCol)
             drawCircle(drawer,n1.x,n1.y,w1,dCol)
             drawTrapezoid(drawer,n.x,n.y,n1.x,n1.y,w,w1,dCol)
+            if n.lake > 0:
+                sd = n.x+n.y
+                random.seed(sd)
+                polygonOrder = random.randint(3,6)
+                if n.lake > 3:
+                    polygonOrder += 1
+                startingAngle = random.randint(0,360)
+                polygonRadius = n.lake
+                polygonCorners = []
+                for p in range(polygonOrder):
+                    dist = polygonRadius*random.uniform(0.5,1.5)
+                    angle = (p*(360/polygonOrder)) + startingAngle + random.uniform(-30,30)
+                    cornerX = n.x + lengthDirX(dist,angle)
+                    cornerY = n.y + lengthDirY(dist,angle)
+                    polygonCorners.append((cornerX,cornerY))
+                drawer.polygon(polygonCorners,dCol,dCol)
 
 class bodyWater:
     def __init__(self,rootNode,sLevel,maxsize=100000):
@@ -869,6 +970,7 @@ class City:
         else:
             self.culture = cltr
         self.name = self.culture.language.genName()
+        self.culture.landmarks.append(self.node)
         self.cityType = self.cType(self.population)
         self.region = self.node.region
         self.node.culture = self.culture
@@ -890,9 +992,8 @@ class City:
         self.foodProduction = 1
         self.age = 0
         self.roads = []
-        self.linkedRoads = []
         self.kind = "city"
-        e = Event(self.culture.myMap,a=self.age,kind="founding",sub=self,actrs=[self.culture.leader])
+        e = Event(self.culture.myMap,a=self.age,kind="founding",sub=self,actrs=[self.culture.leader],loc=self.node)
         e.importance = random.randint(10,40)+clamp(math.floor(math.sqrt(self.population)),0,25)
     def distanceToCity(self,other):
         return self.node.dist(other.node)
@@ -962,6 +1063,47 @@ class City:
                 happinessModifier = actionModifiers[a]/opinionCount
                 h += happinessModifier*distanceModifier
         return clamp(h,0,1)
+    def getPortNode(self):
+        if self.node.hasWaterNeighbor() == 1 or self.node.river != None:
+            return self.node
+        possibleChoices = []
+        firstChoices = []
+        for k in self.node.resourceRegion.nodes:
+            if (k.landmass != None and k.hasWaterNeighbor() == 1) or k.river != None:
+                possibleChoices.append(k)
+                if k.structure() == "fort" or k.structure() == "port":
+                    firstChoices.append(k)
+        portNode = None
+        for p in firstChoices:
+            if portNode == None or self.node.dist(p) < self.node.dist(portNode):
+                portNode = p
+        if portNode != None:
+            return portNode
+        for p in possibleChoices:
+            if portNode == None or self.node.dist(p) < self.node.dist(portNode):
+                portNode = p
+        return portNode
+    def raiseNavy(self,n,cont=1):
+        t = "navy"
+        q = None
+        for p in n.entities:
+            if p.kind == "fleet":
+                q = p
+        if q == None and self.population >= 2:
+            q = Population(c=self.culture,n=None,t="",a=None,p=1,kind="fleet",node=n,prf=t)
+            q.skill = CombatTools.startingSkill
+            self.population -= 1
+        if q.number != cont:
+            maxUnits = clamp(self.population-1,1,10000000)
+            unitCount = min(maxUnits,cont)
+            newUnitProportion = unitCount/(q.number+unitCount)
+            oldUnitProportion = q.number/(q.number+unitCount)
+            newUnitSkill = CombatTools.startingSkill*newUnitProportion
+            oldUnitSkill = q.skill*oldUnitProportion
+            q.number += unitCount
+            q.skill = newUnitSkill+oldUnitSkill
+            self.population -= unitCount
+        return q
     def raiseArmy(self,t="guard infantry",cont=1):
         q = None
         for p in self.node.entities:
@@ -972,7 +1114,7 @@ class City:
             q.skill = CombatTools.startingSkill
             self.population -= 1
         if q.number != cont:
-            maxUnits = clamp(self.population-1,1,1000000)
+            maxUnits = clamp(self.population-1,1,10000000)
             unitCount = min(maxUnits,cont)
             newUnitProportion = unitCount/(q.number+unitCount)
             oldUnitProportion = q.number/(q.number+unitCount)
@@ -987,14 +1129,20 @@ class City:
         militarizedPercentage = self.culture.militarizedPercentage()
         percentNeeded = self.culture.militarization-militarizedPercentage
         if (percentNeeded > 0):
-            garrTarget = math.floor(self.population*percentNeeded*0.4)
-            if garrTarget > 0:
-                self.raiseArmy("guard infantry",garrTarget)
-            offensiveTarget = garrTarget
-            if offensiveTarget > 0:
-                chosenType = random.choice(self.culture.offensiveArmyTypes)
-                self.raiseArmy(chosenType,offensiveTarget)
-        for q in [e for e in self.node.entities if (e.dead == 0 and (e.kind == "army" or (e.profession == "tactician" and e.age > CombatTools.militaryAge)) and e.culture == self.culture)]:
+            getPort = self.getPortNode()
+            if getPort != None and random.random() > 0.5:
+                navalTarget = math.floor(self.population*percentNeeded*0.5)
+                fleet = self.raiseNavy(getPort,navalTarget)
+                fleet.formUp()
+            else:
+                garrTarget = math.floor(self.population*percentNeeded*0.4)
+                if garrTarget > 0:
+                    self.raiseArmy("guard infantry",garrTarget)
+                offensiveTarget = garrTarget
+                if offensiveTarget > 0:
+                    chosenType = random.choice(self.culture.offensiveArmyTypes)
+                    self.raiseArmy(chosenType,offensiveTarget)
+        for q in [e for e in self.node.entities if (e.dead == 0 and (e.kind == "army" or e.kind == "fleet" or (e.profession == "tactician" and e.age > CombatTools.militaryAge)) and e.culture == self.culture)]:
             q.formUp()
         rscShare = self.population/self.node.resourceRegion.totalPop
         rscMax = [0,0]
@@ -1053,6 +1201,13 @@ class City:
                     del i.cities[self.name]
         self.cityType = self.cType(self.population)
         self.diaspora()
+        if self.population > 100:
+            for n in self.node.resourceRegion.nodes:
+                if n not in self.node.linkedRoads and self.node not in n.linkedRoads:
+                    if random.random() > 0.2:
+                        structure = n.structure()
+                        if structure == "fort" or structure == "port":
+                            self.sendRoadbuilders(n)
         self.cType(self.population)
     def diaspora(self):
         self.threshold = 1500*(0.99**self.age)
@@ -1084,7 +1239,7 @@ class City:
         and self.age > 12 and (random.random() < 1/(len(self.culture.cultureCities())))):
             self.migrate()
     def migrate(self):
-        emigrants = math.ceil(self.population*random.uniform(0.1,0.5))
+        emigrants = math.ceil(self.population*random.uniform(0.12,0.46))
         rng = 96
         if self.culture.society in ["Nomadic tribe","Colonists","Nomads","Nomadic artisans","Mariners"]:
             rng += 48
@@ -1094,15 +1249,18 @@ class City:
         yy = clamp(self.node.y + random.randint(-rng,rng),20,self.myMap.yDim-20)
         n = self.myMap.nearestNode(xx,yy)
         if ((n.culture == self.culture or n.culture == None) 
-            and n.city == None and n.resourceRegion == None and n.landmass != None):
+            and n.city == None and n.resourceRegion == None and n.landmass != None and n.lake == 0):
             cc = City(n,pop=emigrants,cltr=self.culture,m=self.myMap)
-            bcount = random.randint(16,23)
-            builders = Population(c=self.culture,t="builders",a=random.randint(20,32),p=bcount,kind="group",node=self.node,prf="roadbuilder")
-            builders.setPath(n)
-            emigrants += bcount
+            self.sendRoadbuilders(n)
             self.population = clamp(self.population-emigrants,1,10000000)
             self.age = 0
-            self.linkedRoads.append(cc)
+    def sendRoadbuilders(self,n):
+        bcount = random.randint(12,23)
+        builders = Population(c=self.culture,t="builders",a=random.randint(20,32),p=bcount,kind="group",node=self.node,prf="roadbuilder")
+        builders.setPath(n)
+        self.population = clamp(self.population-bcount,1,10000000)
+        self.node.linkedRoads.append(n)
+        n.linkedRoads.append(self.node)
     def cType(self,p):
         if p <= self.popThresholds[0]:
             c = synonym("camp",seedNum(self.name))
@@ -1474,7 +1632,7 @@ class Culture:
         self.bannerColor = self.flag.colors[0]
         self.leaderTitle = self.setLeaderTitle()
         societyType = self.society.lower()
-        possiblyHereditaryRuledTypes = ["shaman","nation","religious","tribe","artisan","blacksmith","craftsm","pirates","raiders","scavengers","nomad"]
+        possiblyHereditaryRuledTypes = ["shaman","nation","religious","tribe","artisan","blacksmith","craftsm","privateers","military dictatorship","scavengers","nomad"]
         for societyTypeString in possiblyHereditaryRuledTypes:
             if societyTypeString in societyType and self.leaderCount == 1:
                 self.hereditaryRule = random.choice([True,False,False])
@@ -1483,6 +1641,7 @@ class Culture:
         self.totalPop = self.populationCount()
         self.oldAge = 65
         self.items = []
+        self.landmarks = []
         self.cultureOpinions = {}
         for p in range(50):
             self.updateTech()
@@ -1922,7 +2081,11 @@ class Culture:
                 tries += 1
             if len(selectedMembers) > 1:
                 newOrg = Organization(f=selectedMembers,o=objectOfOrg)
-                e = Event(self.culture.myMap,a=0,kind="founding",sub=newOrg,actrs=selectedMembers)
+                location = None
+                for m in selectedMembers:
+                    if m.location != None:
+                        location = m.location
+                e = Event(self.culture.myMap,a=0,kind="founding",sub=newOrg,actrs=selectedMembers,loc=location)
                 e.importance += newOrg.mostImportantMember().importance*0.33
     def election(self):
         happiness = self.happiness()
@@ -1935,7 +2098,7 @@ class Culture:
                 politicians = self.listOfProfessions("politician")
                 if self.religiousRule == True:
                     politicians += self.listOfProfessions("priest")
-                politicians = [p for p in politicians if p.age > 17]
+                politicians = [p for p in politicians if p.age > CombatTools.militaryAge]
                 if ll in politicians:
                     politicians.remove(ll)
                 if random.random() > (0.3*len(politicians)) or len(politicians) == 0:  # Either elect a new politician
@@ -2005,7 +2168,7 @@ class Culture:
         if ("craftsmen" in m or "metallurgy" in m or "builders" in m) and "simplicity" in m and ("superstition" in m or "astrology" in m):
             return "Traditionalist artisans"
         if (("travelers" in m or "sailors" in m) and "greed" in m and "warriors" in m):
-            return "Raiders"
+            return "Military dictatorship"
         if (("travelers" in m or "sailors" in m) and "greed" in m and "simplicity" in m):
             return "Scavengers"
         if "shamans" in m and "warriors" in m and ("astrology" in m or "superstition" in m or "worship" in m):
@@ -2028,7 +2191,7 @@ class Culture:
         if "metallurgists" in m and "builders" in m and "craftsmen" in m and "materialism" in m:
             return "Cooperative artisans"
         if "greed" in m and "sailors" in m and "warriors" in m:
-            return "Pirates"
+            return "Privateers"
         if "individualism" in m and "traders" in m and ("builders" in m or "craftsmen" in m or "metallurgists" in m):
             return "Liberal merchant-artisans"
         if "collectivism" in m and "individualism" in m:
@@ -2084,9 +2247,9 @@ class Culture:
         if "travelers" in m:
             return "Nomads"
         if "greed" in m and "warriors" in m:
-            return "Raiders"
+            return "Military dictatorship"
         if "sailors" in m and "warriors" in m:
-            return "Pirates"
+            return "Privateers"
         if "traders" in m:
             return "Traders"
         if "greed" in m:
@@ -2133,8 +2296,8 @@ class Culture:
         titleDict.update(dict.fromkeys(["Shamanistic warriors",
                             "Shamanic tribe",
                             "Shamans"],["Mystics","Shamanate","Order"]))
-        titleDict.update(dict.fromkeys(["Pirates",
-                             "Raiders"],["Brigands","Raiders","Legion","Bands","Privateers"]))
+        titleDict.update(dict.fromkeys(["Privateers",
+                             "Military dictatorship"],["Brigands","Raiders","Legion","Bands","Warriors","Marauders","Battalions"]))
         titleDict.update(dict.fromkeys(["Social democracy",
                               "Liberals"],["Republic"]))
         titleDict.update(dict.fromkeys(["Scholars",
@@ -2211,7 +2374,7 @@ class Culture:
             or self.society == "Shamans"):
             return (random.choice(["Elder","High","Grand","Ancestral"])+ " " +
                     random.choice(["Medicine Man","Seer","Shaman"]))
-        if self.society == "Pirates" or self.society == "Raiders":
+        if self.society == "Privateers" or self.society == "Military dictatorship":
             return (random.choice(["Chief ","Head ","Lead ","Prime ","High "]) +
                     random.choice(["Captain","Commander","Warlord"]))
         if self.society == "Scholars" or self.society == "Astronomers":
@@ -3179,14 +3342,10 @@ class Opinion:
                 self.other.tradeAgreements[self.culture.name] = True
                 self.roads += road_increment
                 closestCities = self.culture.closestCities(self.other)
-                if closestCities[1] not in closestCities[0].linkedRoads and closestCities[0] not in closestCities[1].linkedRoads:
+                if closestCities[1].node not in closestCities[0].node.linkedRoads and closestCities[0].node not in closestCities[1].node.linkedRoads:
                     if closestCities[0].distanceToCity(closestCities[1]) < self.roads:
-                        closestCities[0].linkedRoads.append(closestCities[1])
-                        bcount = random.randint(17,23)
-                        builders = Population(c=closestCities[0].culture,t="builders",a=random.randint(20,32),p=bcount,kind="group",node=closestCities[0].node,prf="roadbuilder")
-                        builders.setPath(closestCities[1].node)
-                        emigrants = bcount
-                        closestCities[0].population = max(closestCities[0].population-emigrants,1)
+                        #closestCities[0].node.linkedRoads.append(closestCities[1].node)
+                        closestCities[0].sendRoadbuilders(closestCities[1].node)
         if ("trade agreements" not in self.activeActions and "trade agreements" not in otherOpinion.activeActions):
             self.roads = max(self.roads-road_increment,0)
             self.culture.tradeAgreements[self.other.name] = False
@@ -3317,11 +3476,17 @@ class Belligerent:
         self.setStance()
         # Assign ranks
         ranksList = CombatTools.commandRanks.copy()
+        navalRanksList = CombatTools.navalRanks.copy()
         for p in self.delegatedArmies:
-            if p.profession == "tactician" and (p.title == "" or p.title in CombatTools.commandRanks):
-                p.title = ranksList[0]
-                if len(ranksList) > 1:
-                    ranksList = ranksList[1:]
+            if p.profession == "tactician" and (p.title == "" or p.title in CombatTools.commandRanks or p.title in CombatTools.navalRanks):
+                if "navy" in p.followerProfessions():
+                    p.title = navalRanksList[0]
+                    if len(navalRanksList) > 1:
+                        navalRanksList = navalRanksList[1:]
+                else:
+                    p.title = ranksList[0]
+                    if len(ranksList) > 1:
+                        ranksList = ranksList[1:]
 
 class Battle:
     def __init__(self,n):
@@ -3545,10 +3710,10 @@ class Population:
                            "artist","artist","philosopher",
                            "researcher","tactician","explorer","explorer",
                            "magician","magician","magician","magician",
-                           "magician","priest","priest","engineer",
+                           "magician","priest","priest","engineer","craftsman",
                            "tactician","tactician","poet","poet","playwright",
                            "playwright","composer","composer","author","author",
-                           "physician","composer","author","poet","artist",
+                           "physician","composer","author","poet","artist","craftsman",
                            "blacksmith","blacksmith","engineer","farmer","physician","assassin"]
         self.fields = {"artist":["art","philosophy"],"philosopher":["philosophy","research","government","trade","diplomacy"],
                       "researcher":["research","medicine"],"politician":["government","trade","diplomacy"],
@@ -3572,7 +3737,7 @@ class Population:
             societyType = self.culture.society
             societyType = societyType.lower()
             if "blacksmiths" in societyType or "craftsmen" in societyType or "artisan" in societyType:
-                self.professions.extend(["blacksmith","blacksmith","blacksmith","engineer","engineer"])
+                self.professions.extend(["blacksmith","blacksmith","blacksmith","engineer","engineer","craftsman"])
             if societyType in ["scholars","astronomers"]:
                 self.professions.extend(["researcher","researcher","researcher","philosopher","physician","philosopher","physician","magician","engineer"])
             if "agricultu" in societyType:
@@ -3662,7 +3827,7 @@ class Population:
             if self.profession == None and self.kind == "army":
                 self.profession = "assault infantry"
             if self.profession == None and self.kind == "fleet":
-                self.profession = "fleet"
+                self.profession = "navy"
             uindex = self.units.index(self.profession)
             self.culture.unitOrdinal[uindex] += 1
             unitnumber = self.culture.unitOrdinal[uindex]
@@ -3778,6 +3943,8 @@ class Population:
                 giveToChoices.append(e)
             elif e in self.relationships.keys():
                 chanceToGive = self.relationships[e]
+                if len(giveToChoices) < 2 and chanceToGive > 0:
+                    chanceToGive = 1
                 if random.random() < chanceToGive:
                     giveToChoices.append(e)
         if len(giveToChoices) == 0:
@@ -3821,6 +3988,19 @@ class Population:
         self.inventory.append(item)
         item.owner = self
         item.move(self.location)
+    def claimUnclaimedItems(self):
+        if self.age < 11:
+            return -1
+        if self.location == None:
+            return -1
+        unclaimedItems = self.location.unclaimedItems()
+        itemCount = len(unclaimedItems)
+        if itemCount == 0:
+            return -1
+        for i in unclaimedItems:
+            chanceToClaim = 1/(itemCount+1)
+            if random.random() < chanceToClaim:
+                self.takeItem(i)
     def setPath(self,n,landy=True):
         if n == self.location:
             return
@@ -3877,6 +4057,9 @@ class Population:
             self.path = None
             if self.profession == "roadbuilder":
                 if nextNode.city != None:
+                    nextNode.city.population += self.number
+                else:
+                    nextNode = self.location.nearestCity()
                     nextNode.city.population += self.number
                 self.erase()
     def travel(self,n):
@@ -3939,6 +4122,8 @@ class Population:
         if self.leader != None:
             self.path = None
     def followerProfessions(self):
+        if len(self.followers) == 0:
+            return []
         return [ff.profession for ff in self.followers]
     def formUp(self):
         war = None
@@ -3951,7 +4136,7 @@ class Population:
             chosenImportance = 0
         else:
             chosenImportance = self.importance
-            if self.age <= 19:
+            if self.age <= CombatTools.militaryAge:
                 return
         # Tacticians cannot follow anyone
         if self.profession == "tactician":
@@ -3961,14 +4146,14 @@ class Population:
         # Same for Fleets
         for potentialLeader in [e for e in self.location.entities if (e.dead == 0 and e.number > 0 and e.kind == "army" and e.culture == self.culture)]:
             if potentialLeader.unitPower() > chosenStrength and self.profession != "tactician":
-                if self.profession != "guard infantry" and potentialLeader.profession != "guard infantry" and self.profession != "fleet" and potentialLeader.profession != "fleet":
+                if self.profession != "guard infantry" and potentialLeader.profession != "guard infantry" and self.profession != "navy" and potentialLeader.profession != "navy":
                     if war == None or potentialLeader in war.delegatedArmies:
                         chosenLeader = potentialLeader
                         chosenStrength = potentialLeader.unitPower()
         for potentialLeader in [e for e in self.location.entities if (e.dead == 0 and e.profession == "tactician" and e.culture == self.culture and e.age > CombatTools.militaryAge)]:
             if potentialLeader.importance > chosenImportance or potentialLeader.profession != "tactician" :
                 leadersFollowerTypes = potentialLeader.followerProfessions()
-                if (self.profession == "fleet" and len(leadersFollowerTypes) == len([k for k in leadersFollowerTypes if k == "fleet"])):
+                if (self.profession == "navy" and len(leadersFollowerTypes) == len([k for k in leadersFollowerTypes if k == "navy"])):
                     if war == None or potentialLeader in war.delegatedArmies:
                         chosenLeader = potentialLeader
                         chosenImportance = potentialLeader.importance
@@ -3976,8 +4161,8 @@ class Population:
                     if war == None or potentialLeader in war.delegatedArmies:
                         chosenLeader = potentialLeader
                         chosenImportance = potentialLeader.importance
-                elif (self.profession not in ["guard infantry","fleet"]
-                and "guard infantry" not in leadersFollowerTypes and "fleet" not in leadersFollowerTypes):
+                elif (self.profession not in ["guard infantry","navy"]
+                and "guard infantry" not in leadersFollowerTypes and "navy" not in leadersFollowerTypes):
                     if war == None or potentialLeader in war.delegatedArmies:
                         chosenLeader = potentialLeader
                         chosenImportance = potentialLeader.importance
@@ -4120,6 +4305,7 @@ class Population:
             self.importance = self.importance*1.0017
         if self.dead == 1:
             return -1
+        self.claimUnclaimedItems()
         if random.random() > 0.9:
             self.createWork()
         self.skill = clamp(self.skill*random.uniform(1.002,1.009),0,1)
@@ -4197,17 +4383,14 @@ class Population:
             if "builders" in m or "metallurgists" in m:
                 self.power[1] *= 1.1
             if self.leader != None:
-                leaderSkill = self.leader.skill
-                multiplier = 1+(leaderSkill*0.25)
-                if self.leader.kind == "tactician":
-                    multiplier = 1+(leaderSkill**2)
+                multiplier = self.leader.getLeadershipMultiplier()
                 self.power[0] *= multiplier
                 self.power[1] *= multiplier
             if len(self.illnesses) > 0:
                 self.power[0] *= 0.5
                 self.power[1] *= 0.5
-            self.power[0] = math.floor(self.power[0])
-            self.power[1] = math.floor(self.power[1])
+            self.power[0] = math.ceil(self.power[0])
+            self.power[1] = math.ceil(self.power[1])
         if self.path != None and self.location != None:
             baseSpeed = self.speed
             for f in self.followers:
@@ -4312,6 +4495,20 @@ class Population:
         if self.kind not in ["army","fleet"]:
             return self.number
         return self.number*self.unitbalance[self.profession][2]
+    def getLeadershipMultiplier(self):
+        if self.kind in ["army","fleet"]:
+            multiplier = 1+(self.skill*0.25)
+            return multiplier
+        maxMultiplier = 1
+        for i in self.inventory:
+            multiplier = i.getLeadershipMultiplier()
+            if multiplier > maxMultiplier:
+                maxMultiplier = multiplier
+        multiplier = ((self.skill**2)*0.7)
+        multiplier *= maxMultiplier
+        multiplier += (clamp(math.log10(self.importance/2),1,2)-1)/2
+        multiplier = multiplier + 1
+        return multiplier
     def hasField(self):
         if self.field == None or self.field == "":
             return False
@@ -4357,6 +4554,8 @@ class Population:
     def vesselCount(self):
         if self.kind not in ["army","fleet"]:
             return 1
+        if self.number == 0:
+            return 0
         shipCount = math.ceil((math.sqrt(self.number)+math.log(self.number))/2)
         return clamp(shipCount,1,self.number)
     def getHeight(self):
@@ -4430,7 +4629,7 @@ class Population:
         fertility *= math.sqrt(self.culture.tech["medicine"])
         if ageGap > 28:
             fertility = 0
-        if random.random()*24 < fertility:
+        if random.random()*24 < fertility and self.age > 12:
             parentsList = [self]
             potentialPartner = self.getPartner()
             if potentialPartner != None:
@@ -4443,22 +4642,25 @@ class Population:
             newChild = Population(childCulture,a=0,p=1,kind="person",node=self.location,pars=parentsList)
             newChild.age += 1
     def createWork(self):
+        if self.dead == 1:
+            return -1
+        if self.location == None:
+            return -1
+        if self.age < 15:
+            return -1
         if not (self.hasField()):
             return -1
         if self.profession == "roadbuilder":
             return -1
-        if self.culture.leader == self and random.random() > 0.35:
+        random.seed(seedNum(self.justName()+self.culture.name)+self.age+self.location.x+self.location.y)
+        if self.culture.leader == self and random.random() > 0.333:
             return -1
-        if self.number > 1 and random.random() > 0.3:
+        if self.number > 1 and random.random() > 0.333:
             return -1
-        if self.age < 15:
-            return -1
-        if self.location == None:
-            return -1
-        kind = "book"
         subj = None
+        kind = "book"
         # Below, roll the chance to produce something other than a non fiction Book
-        metalObjects = ["weapon","helmet","bodice","shield","tool"]
+        metalObjects = ["weapon","helmet","bodice","shield","tool","accessory"]
         artTypes = ["story","play","poem","song","piece"]
         if random.random() < 0.05:
             kind = "story"
@@ -4466,23 +4668,23 @@ class Population:
             kind = random.choice(artTypes)
         elif random.random() < 0.03:
             kind = random.choice(metalObjects)
-        elif self.profession in ["artist","philosopher","politician","tactician","poet","playwright","magician","priest","composer"] and random.random() > 0.8:
+        elif self.profession in ["artist","philosopher","politician","tactician","assassin","poet","playwright","magician","priest","composer"] and random.random() > 0.8:
             kind = "story"
         elif self.profession in ["artist"] and random.random() > 0.15:
             kind = "piece"
-        elif self.profession in ["author"] and random.random() > 0.3:
+        elif self.profession in ["author"] and random.random() > 0.27:
             kind = "story"
-        elif self.profession in ["playwright"] and random.random() > 0.25:
+        elif self.profession in ["playwright"] and random.random() > 0.16:
             kind = "play"
-        elif self.profession in ["poet"] and random.random() > 0.15:
+        elif self.profession in ["poet"] and random.random() > 0.11:
             kind = "poem"
-        elif self.profession in ["composer"] and random.random() > 0.15:
+        elif self.profession in ["composer"] and random.random() > 0.1:
             kind = "song"
         elif self.profession in ["craftsman","blacksmith","engineer"] and random.random() > 0.15:
             kind = random.choice(metalObjects)
         elif self.profession in ["magician"] and random.random() > 0.3:
             kind = "magic"
-        elif self.profession in ["priest"] and random.random() > 0.6:
+        elif self.profession in ["priest","philosopher","assassin"] and random.random() > 0.66:
             kind = "magic"
         if kind == "magic":
             newSpell = Magic(self)
@@ -4491,7 +4693,7 @@ class Population:
             return
         t = ""
         if random.random() > 0.35:
-            t = random.choice(["event","event","event","event","pop","pop","item","item"])
+            t = random.choice(["event","event","event","event","pop","pop","item","item","node"])
         # ONLY have subjects of works be from cultures known to the creator.
         knownCultures = self.culture.knownCultureOpinions()
         selectFromCultures = []
@@ -4527,13 +4729,21 @@ class Population:
                 i = random.choice(cc.items)
             subj = i
             i.importance = i.importance*(1+(random.uniform(0.1,0.4)**2))
+        if t == "node" and len(self.culture.landmarks) != 0:
+            cc = [self.culture,self.culture,self.culture,self.culture,
+                                random.choice(selectFromCultures)]
+            ii = random.choice(cc)
+            while len(ii.landmarks) == 0:
+                ii = random.choice(cc)
+            i = random.choice(ii.landmarks)
+            subj = i
         if self.field not in ["art"]:
-            if random.random() > 0.6:
+            if random.random() < 0.46:
                 fff = self.field
             else:
                 fff = self.culture.conceptualSpheres.getWeightedLinkedConcept(self.field)
         else: 
-            if random.random() > 0.85:
+            if random.random() < 0.15:
                 fff = self.field
             else:
                 fff = self.culture.conceptualSpheres.getWeightedLinkedConcept(self.field)
@@ -4723,6 +4933,14 @@ class Population:
             if self.number > 1:
                 s += "s"
             s += ".\n"
+        for i in self.illnesses:
+            if self.gender == 3 or self.kind in ["group","army","fleet"]:
+                s += "They have "
+            else:
+                s += self.pronouns[self.gender].capitalize() + " "
+                s += "has "
+            s += i.name
+            s += ".\n"
         committedWar = self.getCommittedWar()
         if len(self.parents) == 0:
             s += ""
@@ -4765,17 +4983,17 @@ class Population:
             s += self.pronouns[self.gender].capitalize() + " " + self.toBe[self.gender]
             s += " the object of veneration for the " + o.name
             s += ".\n"
-        if self.kind == "beast" or self.kind == "army":
+        if self.kind == "fleet" or (self.location != None and self.location.landmass == None and self.kind in ["beast","army"]):
+            s += self.possessive[self.gender].capitalize()
+            s += " naval power is approximately equal to "
+            s += str(math.ceil(self.power[0]/10)) + " cannons.\n"
+        elif self.kind in ["beast","army"]:
             s += self.possessive[self.gender].capitalize()
             s += " offensive power is approximately equal to "
             s += str(self.power[0]) + " men.\n"
             s += self.possessive[self.gender].capitalize()
             s += " defensive power is approximately equal to "
             s += str(self.power[1]) + " men.\n"
-        if self.kind == "fleet":
-            s += self.possessive[self.gender].capitalize()
-            s += " naval power is approximately equal to "
-            s += str(math.ceil(self.power[0]/15)) + " cannons.\n"
         if len(self.followers) > 0:
             s += "\n"
             s += "Also under " + self.possessive[self.gender] + " command is:\n"
@@ -4802,14 +5020,6 @@ class Population:
         else:
             s += "legendary"
         s += ".\n"
-        for i in self.illnesses:
-            if self.gender == 3 or self.kind in ["group","army","fleet"]:
-                s += "They have "
-            else:
-                s += self.pronouns[self.gender].capitalize() + " "
-                s += "has "
-            s += i.name
-            s += ".\n"
         if self.dead == 1:
             s += self.pronouns[self.gender].capitalize()+ " " + self.toBe[self.gender]
             if self.kind in ["group","army","fleet"]:
@@ -5243,7 +5453,7 @@ class Map:
             names = ""
             for f in n.river.culturalNames.keys():
                 q = n.river.culturalNames[f] + " "
-                q += "river"
+                q += "River"
                 q += " (" + f + " language)"
                 names += q + "\n"
             return names
@@ -5286,6 +5496,12 @@ class Map:
         self.divWidth = 64
         info = ""
         pops = len(n.entities)
+        if n.peakName != "":
+            info += n.peakName + "\n"
+        if n.lakeName != "":
+            info += n.lakeName + "\n"
+        if n.structureName != "":
+            info += n.structureName + "\n"
         if pops != 0:
             info += "Number of notable entities at this location: " + str(pops) + "\n"
         if n.city != None:
@@ -5338,7 +5554,7 @@ class Map:
             dist = search.dist(p.node)
             if dist < minDist:
                 minDist = dist
-                n = p
+                n = p.node
         return n
     def setSeaLevel(self,n):
         self.sealevel = n
@@ -5534,8 +5750,12 @@ class Map:
             for n in p.neighbors:
                 if n.river != None:
                     rainfall = rainfall*1.3
+                if n.lake > 0:
+                    rainfall = rainfall*1.4
             if p.river != None:
-                rainfall = rainfall*1.2
+                rainfall = rainfall*1.4
+            if p.lake > 0:
+                rainfall = rainfall*1.5
             for l in p.neighbors:
                 if l.watery() == 1:
                     rainfall *= 1.4
@@ -5579,6 +5799,14 @@ class Map:
             if p.biome == "mountains" and p.elevation > Tools.snowCapHeight*random.uniform(1,1.02) and p.temp < 0.6:
                 biomeColor = self.biomeColors["frost"]
             p.setBiomeColor(biomeColor)
+            highestNeighbor = max([n.elevation for n in p.neighbors])
+            if p.elevation > highestNeighbor:
+                if p.elevation > Tools.snowCapHeight:
+                    p.peak = 3
+                elif p.elevation > Tools.mountainHeight*random.uniform(0.88,0.99):
+                    p.peak = 2
+                else:
+                    p.peak = 1
     def setWildlife(self):
         for p in self.atlas:
             p.herbivores = clamp((p.vegetation*random.uniform(0.8,1.25))**1.5,0,1)
@@ -5962,16 +6190,16 @@ class Map:
         # e.g. "medieval humanity", "classical period humanity"
     def biomeWildlife(self):
         self.wildlife = {}
-        self.wildlife["desert"] = [["hare","camel","rhinoceros","hippopotamus"],["scorpion","snake","vulture","lizard"]]
-        self.wildlife["savanna"] = [["antelope","elephant","rhinoceros","giraffe","hippopotamus"],["lion","hyena"]]
-        self.wildlife["tundra"] = [["hare","reindeer","yak"],["wolf","bear"]]
-        self.wildlife["shrubland"] = [["hare","deer","tortoise","goat"],["fox","lynx"]]
-        self.wildlife["boreal forest"] = [["hare","reindeer","moose","yak"],["wolf","bear","owl","fox"]]
-        self.wildlife["forest"] = [["deer","tortoise","tapir","squirrel"],["tiger","bear","lynx","wolf"]]
-        self.wildlife["tropical forest"] = [["monkey","gorilla","tapir","sloth","frog","hippopotamus"]
-        ,["tiger","snake","panther","lizard"]]
-        self.wildlife["frost"] = [["penguin","hare"],["bear","wolf"]]
-        self.wildlife["mountains"] = [["goat","alpaca","yak"],["wolf","cougar","hawk","snake"]]
+        self.wildlife["desert"] = [["hare","camel","rhinoceros","hippopotamus","rat"],["scorpion","snake","vulture","lizard"]]
+        self.wildlife["savanna"] = [["antelope","elephant","rhinoceros","giraffe","hippopotamus","hare","rat"],["lion","hyena","vulture"]]
+        self.wildlife["tundra"] = [["hare","reindeer","yak","penguin","rat"],["wolf","bear","owl"]]
+        self.wildlife["shrubland"] = [["hare","deer","tortoise","goat","rat"],["fox","lynx","snake","hawk","eagle"]]
+        self.wildlife["boreal forest"] = [["hare","reindeer","moose","yak","rat"],["wolf","bear","owl","fox","eagle"]]
+        self.wildlife["forest"] = [["deer","tortoise","tapir","squirrel","hare","rat"],["tiger","bear","lynx","wolf","eagle","hawk"]]
+        self.wildlife["tropical forest"] = [["monkey","gorilla","tapir","sloth","frog","hippopotamus","rat"]
+        ,["tiger","snake","panther","lizard","vulture"]]
+        self.wildlife["frost"] = [["penguin","hare","reindeer"],["bear","wolf","seal","fox"]]
+        self.wildlife["mountains"] = [["goat","alpaca","yak","rat"],["wolf","cougar","hawk","snake","eagle","vulture"]]
         self.wildlife["water"] = [["carp","salmon","tuna","manatee","whale","turtle","lobster","crab"]
         ,["shark","seal","squid","octopus","swordfish","dolphin"]]
         self.wildlife["ruins"] = [[],[]]
@@ -5985,19 +6213,9 @@ class Map:
         if len(self.cities) < 1:
             return self.xDim
         else:
-            c = self.nearestCity(xx,yy).node
+            c = self.nearestCity(xx,yy)
             d = Node(xx,yy,self).dist(c)
             return d
-    def placeCity(self,xx,yy,pop=50,culture=None,node=None):
-        if node != None:
-            cityNode = self.nearestNode(xx,yy)
-        else:
-            cityNode = node
-        if cityNode.biome != "water" and cityNode.city == None:
-            newCity = City(cityNode,pop,culture,self)
-            return 1
-        else:
-            return -1
     def randomCity(self):
         cityNode = random.choice(self.atlas)
         tries = 32
@@ -6005,7 +6223,7 @@ class Map:
         while (cityNode.biome == "water" or cityNode.city != None or
                cityNode.x < 32 or cityNode.x > self.xDim-32 or cityNode.y < 32 
                or cityNode.y > self.yDim-32 or self.nearestCityDist(cityNode.x,cityNode.y) < 32
-               or (cityNode.hasWaterNeighbor(self.sealevel) == 0 and q < tries)):
+               or cityNode.lake > 0 or (cityNode.hasWaterNeighbor(self.sealevel) == 0 and q < tries)):
             q = q+1
             cityNode = random.choice(self.atlas)
         newCity = City(cityNode,pop=random.randint(15,200),m=self)
@@ -6023,7 +6241,7 @@ class Map:
                 aquatic = 1
             else:
                 aquatic = 0
-            culture = self.nearestCity(anchor.x,anchor.y).culture
+            culture = self.nearestCity(anchor.x,anchor.y).city.culture
             age = random.randint(24,256)
             monster = Population(c=culture,n=None,t="",a=age,p=1,kind="beast",node=anchor)
     def drawGraph(self,gui=None):
@@ -6201,7 +6419,7 @@ class Map:
         b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
         c1 = "medium aquamarine"
         b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-        if e.subject.tt not in ["item"]:
+        if e.subject.tt not in ["item","culture"]:
             g = e.subject
             s = " "+g.justName()+" "
             b1 = Button(self.infoGui,text=s)
@@ -6262,9 +6480,9 @@ class Map:
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = f: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "SteelBlue1"
-            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-        if e.subject != None:
+            c3 = "SteelBlue3"
+            b1.config(bg=c3,activebackground=c3,activeforeground=c3)
+        if e.subject != None and e.subject.tt != "node":
             g = e.subject
             s = " "+g.justName()+" (Subject) "
             b1 = Button(self.infoGui,text=s)
@@ -6275,8 +6493,8 @@ class Map:
             if g.tt == "item":
                 b1.configure(command = lambda self=self, d = g: self.itemInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "SteelBlue2"
-            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+            c2 = "SteelBlue4"
+            b1.config(bg=c2,activebackground=c2,activeforeground=c2)
         if e.creationEvent != None:
             g = e.creationEvent
             bText = "Creation (" + str(g.age) + " years ago)"
@@ -6374,12 +6592,20 @@ class Map:
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = g: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "SteelBlue2"
+            c1 = "SteelBlue1"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
         for g in p.kids:
             s = " "+g.justName()+" (Child) "
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = g: self.popInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c1 = "SteelBlue2"
+            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        if p.leader != None:
+            l = p.leader
+            s = " "+l.justName()+" (Leader) "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = l: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "SteelBlue3"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
@@ -6387,14 +6613,6 @@ class Map:
             s = " "+f.justName()+" (Follower) "
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = f: self.popInfo(d))
-            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "SteelBlue4"
-            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-        if p.leader != None:
-            l = p.leader
-            s = " "+l.justName()+" (Leader) "
-            b1 = Button(self.infoGui,text=s)
-            b1.configure(command = lambda self=self, d = l: self.popInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "SteelBlue4"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
@@ -6410,30 +6628,30 @@ class Map:
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = o: self.orgListInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "SlateBlue2"
-            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-        for g in [g for g in p.works if g.owner != p]:
+            c2 = "SlateBlue2"
+            b1.config(bg=c2,activebackground=c2,activeforeground=c2)
+        for g in [g for g in p.works]:
             s = " "+g.justName()+" (Creation) "
+            if g in p.inventory:
+                s = " "+g.justName()+" (Creation in inventory) "
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = g: self.itemInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "tan4"
+            c1 = "tan3"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
+        for g in [g for g in p.inventory if g not in p.works]:
+            s = " "+g.justName()+" (In inventory) "
+            b1 = Button(self.infoGui,text=s)
+            b1.configure(command = lambda self=self, d = g: self.itemInfo(d))
+            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
+            c3 = "tan4"
+            b1.config(bg=c3,activebackground=c3,activeforeground=c3)
         for g in p.magic:
             s = " "+g.justName()+" (Magic) "
             b1 = Button(self.infoGui,text=s)
             b1.configure(command = lambda self=self, d = g: self.magicInfo(d))
             b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
             c1 = "chocolate3"
-            b1.config(bg=c1,activebackground=c1,activeforeground=c1)
-        for g in p.inventory:
-            s = " "+g.justName()+" (In inventory) "
-            if g in p.works:
-                s = " "+g.justName()+" (Creation in inventory) "
-            b1 = Button(self.infoGui,text=s)
-            b1.configure(command = lambda self=self, d = g: self.itemInfo(d))
-            b1.pack(anchor=S,side=TOP,expand=YES,fill=BOTH)
-            c1 = "tan4"
             b1.config(bg=c1,activebackground=c1,activeforeground=c1)
     def cultureInfo(self,reset=False):
         if self.displayNo == None:

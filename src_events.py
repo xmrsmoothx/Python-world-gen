@@ -37,6 +37,8 @@ class Event:
             s += self.kind + " of "
         if self.kind in ["reformation","war","ceasefire"]:
             s += "the " + self.oldCultureName
+        elif self.kind in ["founding","disbanding"] and self.subject.tt not in ["city"]:
+            s += "the " + self.subject.justName()
         else:
             s += self.subject.justName()
         return s
@@ -130,18 +132,8 @@ class Event:
         s += ".\n"
         if self.location != None:
             s += "This happened at "
-            if self.location.city != None:
-                c = self.location.city
-                s += c.name + ", the " + c.cType(c.population)
-                s += ", belonging to the " + c.culture.name + " " + c.culture.title+".\n"
-            else:
-                if self.subject.culture.name not in self.location.region.culturalNames:
-                    s += "an unnamed " + self.location.region.biome
-                else:
-                    s += "the "
-                    s += self.location.region.biome + " "
-                    s += self.location.region.culturalNames[self.subject.culture.name]
-                s += ".\n"
+            s += self.location.nodeNotes()
+            s += "\n"
         s += "This event is generally considered "
         if self.importance < 11:
             s += "minor"
