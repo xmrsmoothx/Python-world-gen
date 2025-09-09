@@ -440,7 +440,7 @@ class Town:
         drawer.line(polygonCorners,dCol,3)
         chosenBlock.drawBuilding(drawer)
     def addFort(self,drawer):
-        polygonSides = random.choice([3,4,4,4,4,5,5,5,6,6,7,8])
+        polygonSides = random.choice([3,4,4,4,4,5,5,5,5,6,6,7,8])
         polygonRadius = math.floor(random.uniform(self.xDim/15,self.xDim/11))
         polygonAngle = random.randint(0,359);
         #polygonLocation = random.choice([(self.xDim/3,self.yDim/2),(self.xDim/1.5,self.yDim/2),(self.xDim/2,self.yDim/3),(self.xDim/2,self.yDim/1.5)])
@@ -469,6 +469,7 @@ class Town:
                             sharedRoad = True
                         if sharedRoad == True:
                             currentBlock = self.nearestSolidBlock(self.x,self.y)
+                            roadCenter = (currentBlock.x,currentBlock.y)
                             roadedBlocks = [currentBlock]
                             buffer = 80
                             while currentBlock.x > buffer and self.xDim-currentBlock.x > buffer and currentBlock.y > buffer and self.yDim-currentBlock.y > buffer:
@@ -507,7 +508,7 @@ class Town:
         for k in self.blocks:
             if k.isTownBlock():
                 k.drawRoads(drawer)
-        nodeStructure = self.node.structure()
+        nodeStructure = self.node.getStructure()
         if self.node.city == None and nodeStructure != None:
             if nodeStructure in ["farm","mill"]:
                 self.addFarm(drawer,roadCenter)

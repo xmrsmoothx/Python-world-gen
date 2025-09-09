@@ -451,10 +451,13 @@ class Item:
             q = "work"
             if self.kind in ["helmet","weapon","bodice","shield"]:
                 q = synonym("detail",seed=seedNum(self.name))
+            connector = "the "
+            if self.subject.tt == "event":
+                connector = ""
             try:
-                s += "The subject of the " + q + " is the " + self.subject.culture.name + " " + self.subject.nameFull() + ".\n"
+                s += "The subject of the " + q + " is " + self.subject.culture.name + " " + self.subject.nameFull() + ".\n"
             except AttributeError: 
-                s += "The subject of the " + q + " is the " + self.subject.nameFull() + ".\n"
+                s += "The subject of the " + q + " is " + self.subject.nameFull() + ".\n"
         s += "The "
         if (self.kind in ["story","book","play","poem"]):
             s += "writing "
@@ -464,13 +467,15 @@ class Item:
             s += "craftsmanship "
         s += "is " + skillTier(self.quality) + ".\n"
         s += "It is generally considered "
-        if self.importance < 13:
+        if self.importance < 10:
             s += "unimportant"
-        elif self.importance < 25:
+        elif self.importance < 21:
+            s += "notable"
+        elif self.importance < 33:
             s += "important"
-        elif self.importance < 45:
+        elif self.importance < 51:
             s += "very important"
-        elif self.importance < 65:
+        elif self.importance < 68:
             s += "extremely important"
         else:
             s += "legendary"

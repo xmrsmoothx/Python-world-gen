@@ -20,7 +20,7 @@ class Event:
         self.actors = actrs
         self.importance = math.ceil(50*(random.uniform(0.1,0.6)**2))
         self.location = loc
-        if self.subject != None and self.kind in ["election","reformation","war","ceasefire"]:
+        if self.subject != None and self.subject.culture != None and self.kind in ["election","reformation","war","ceasefire","battle"]:
             self.oldLeaderTitle = self.subject.culture.leaderTitle
             self.oldCultureName = self.subject.culture.shortName()
     def ageEvent(self):
@@ -33,6 +33,8 @@ class Event:
         s = "The "
         if self.kind in ["war","ceasefire"]:
             s += self.kind + " with "
+        if self.kind == "disbanding" and len(self.actors) > 0:
+            s += "defeat of "
         else:
             s += self.kind + " of "
         if self.kind in ["reformation","war","ceasefire"]:
@@ -48,14 +50,38 @@ class Event:
             s += self.kind + " declared on the "
         elif self.kind == "ceasefire":
             s += self.kind + " signed with the "
-        else:    
+        elif self.kind == "battle":
+            s += self.kind + " of "
+        elif self.kind == "disbanding":
+            if len(self.actors) == 0:
+                s += self.kind + " of "
+            else:
+                s += " defeat of the "
+        else:
             s += self.kind + " of the "
         s += self.subject.nameFull()
         if self.actors != []:
-            s += " by " + self.actors[0].justName()
-            for k in self.actors:
-                if k != self.actors[0]:
-                    s += " and " + k.justName()
+            if self.kind not in ["battle","disbanding"]:
+                s += " by " + self.actors[0].justName()
+                for k in self.actors:
+                    if k != self.actors[0]:
+                        s += " and " + k.justName()
+            else:
+                if self.kind == "battle":
+                    s += ", fought by "
+                elif self.kind == "disbanding":
+                    s += " by "
+                actrIndex = 1
+                for k in self.actors:
+                    if actrIndex < 4:
+                        if k != self.actors[0]:
+                            s += ", "
+                        if actrIndex == 3 or k == self.actors[-1]:
+                            s += "and "
+                        if k.kind in ["fleet","army"]:
+                            s += "the "
+                        s += k.justName()
+                        actrIndex += 1
         if self.year > 1:
             s += " in the year " + str(self.year)
             s += " (" + str(self.age) + " years ago)"
@@ -73,10 +99,21 @@ class Event:
             s += str(self.age) + " years ago, "
         else:
             s += "Before time, "
-        if self.kind not in ["reformation","war"]:
+        if self.kind not in ["reformation","war","battle"]:
             s += "the " + self.subject.nameFull()
+        elif self.kind == "battle":
+            s += "the battle of " + self.subject.nameFull()
         else:
             s += "the " + self.oldCultureName
+        if self.kind == "battle":
+            s += " was fought, by "
+            for k in self.actors:
+                if k != self.actors[0]:
+                    s += ", "
+                if k == self.actors[-1]:
+                    s += "and "
+                s += "the "
+                s += k.nameFull()
         if self.kind == "founding":
             s += " was founded"
             if len(self.actors) == 1:
@@ -117,8 +154,17 @@ class Event:
         if self.kind == "disbanding":
             if len(self.actors) == 0:
                 s += " disbanded"
-            else:
+            elif len(self.actors) == 1:
                 s += " was defeated by the " + self.actors[0].nameFull()
+            else:
+                s += " was defeated by "
+                for k in self.actors:
+                    if k != self.actors[0]:
+                        s += ", "
+                    if k == self.actors[-1]:
+                        s += "and "
+                    s += "the "
+                    s += k.nameFull()
         if self.kind == "destruction":
             s += " was destroyed"
             if len(self.actors) > 0:
@@ -135,11 +181,13 @@ class Event:
             s += self.location.nodeNotes()
             s += "\n"
         s += "This event is generally considered "
-        if self.importance < 11:
+        if self.importance < 10:
             s += "minor"
-        elif self.importance < 24:
+        elif self.importance < 21:
+            s += "notable"
+        elif self.importance < 34:
             s += "significant"
-        elif self.importance < 43:
+        elif self.importance < 50:
             s += "major"
         elif self.importance < 71:
             s += "extremely momentous"

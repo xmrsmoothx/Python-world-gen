@@ -99,6 +99,7 @@ class BookTools:
     trimColors = [(12,12,12),(235,235,235),(240,180,20),(60,60,60),(46,32,21),(36,26,24)]
 
 class Tools:
+    maxCityPop = 100000000
     streetColor = (117, 96, 66)
     waterColor = (48, 76, 94)
     buildingColor = (40, 40, 40)
@@ -111,6 +112,7 @@ class Tools:
     plotSecondCol = (0,240,0)
     mountainHeight = 0.85
     snowCapHeight = 0.91
+    mundaneProfessions = ["roadbuilders"]
     technologies = {}
     technologies["weaponry"] = 1
     technologies["defense"] = 1
@@ -136,15 +138,16 @@ class CombatTools:
     armyTypes = ["assault infantry","guard infantry","siege","artillery","ranged infantry","mechanized","cavalry","navy","beast"]
     standardArmyTypes = ["assault infantry","siege","artillery","ranged infantry","cavalry"]
     rps = {"assault infantry":["artillery","siege"],
-                    "guard infantry":["assault infantry","ranged infantry","cavalry"],
-                    "siege":["guard infantry","artillery"],
-                    "artillery":["guard infantry","assault infantry","ranged infantry","artillery","mechanized"],
+                    "guard infantry":["assault infantry","ranged infantry","cavalry","navy"],
+                    "siege":["guard infantry","artillery","navy"],
+                    "artillery":["guard infantry","assault infantry","ranged infantry","artillery","mechanized","navy"],
                     "ranged infantry":["assault infantry","cavalry"],
                     "mechanized":["siege","cavalry","artillery","assault infantry","ranged infantry"],
                     "cavalry":["assault infantry","artillery","siege","cavalry"],
+                    "navy":["artillery","guard infantry"]
                     }
     # How much more offensive power armies have against army types they're strong against
-    rpsMultiplier = 2
+    rpsMultiplier = 2.5
     # First value is offensive modifier; second value is defensive modifier; third value is unit weight modifier
     unitBalance = {"assault infantry":[1,1,1.2],
                             "guard infantry":[1,1.5,1.2],
@@ -154,6 +157,7 @@ class CombatTools:
                             "mechanized":[1.5,1.5,3],
                             "cavalry":[1.25,1,1.8],
                             "navy":[10,10,4]}
+    unitSpeed = {"assault infantry":3,"guard infantry":2,"siege":2,"artillery":2,"ranged infantry":3,"mechanized":4,"cavalry":4,"navy":5}
     baseMilitarization = 0.08
     startingSkill = 0.4
     commandRanks = ["General","Colonel","Colonel","Commander","Commander","Commander","Captain","Captain","Captain","Captain","Captain","Captain"]
@@ -308,7 +312,7 @@ def synonym(x,seed=0,exclusive=0):
     s["diplomacy"] = ["diplomacy","foreign affairs","foreign policy","international relations","foreign relations"]
     s["constellations"] = ["constellations","astrology","astronomy","stars"]
     s["illness"] = ["illness","disease","flu","fever","cough","pox","sickness"]
-    s["peak"] = ["peak","mountain","summit","ridge"]
+    s["peak"] = ["peak","mountain","summit","ridge","cliff","massif"]
     s["hill"] = ["hill","bluff","cliff","ridge","knoll","hillock"]
     s["pond"] = ["pond","lake","reservoir","lagoon"]
     syn = x
