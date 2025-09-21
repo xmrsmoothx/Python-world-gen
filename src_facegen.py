@@ -17,9 +17,6 @@ def clamp(x,minimum,maximum):
     else:
         return x
 
-def avg2(v1,v2):
-    return ((v1+v1)/2)
-
 class Face:
     def __init__(self,c,n=None,p=None,x=128):
         self.culture = c

@@ -19,6 +19,7 @@ from src_facegen import *
 from src_magic import *
 from src_concepts import *
 import string
+import colorsys
 
 def lerp(t,a,b):
     return a + t * (b - a)
@@ -172,12 +173,13 @@ class Node:
                     return 1
         return 0
     def shipTraversable(self):
-        if self.watery() == 1 or self.landmass == None:
+        if self.watery(-1) == 1 or self.landmass == None:
             return True
-        if self.hasWaterNeighbor() == 1:
+        if self.hasWaterNeighbor(-1) == 1:
             return True
         if self.river != None:
             return True
+        return False
     def nearestNeighbor(self,n):
         distance = 100000000000
         nbr = self
@@ -1683,6 +1685,18 @@ class Culture:
         self.totalEnemyStrength = 1
         self.totalMilitaryStrength = 1
         self.stats = {"Comparative Power":[1],"Population":[],"Militarized Population":[],"Technology":[],"Happiness":[0.6]}
+        self.latitude = (self.origin.dist(self.myMap.north)/self.myMap.xDim)
+        self.latitude = self.latitude/1.3
+        self.latitude *= (math.pi)
+        self.latitude -= math.pi/2
+        numConstellations = random.randint(math.floor(len(self.deities)/2),len(self.deities)+1) + random.randint(0,3)
+        numConstellations = min(numConstellations,10)
+        for n in range(numConstellations):
+            rootStar = random.choice(self.myMap.stars)
+            while abs(self.latitude-rootStar.declination) > random.uniform(0.1,0.3) or rootStar.apparentMagnitude > -3:
+                rootStar = random.choice(self.myMap.stars)
+            newConstellation = Constellation(self,rootStar)
+            self.myMap.constellations.append(newConstellation)
     def strengthCalc(self):
         self.strength = 1 + math.sqrt(self.populationCount()*3)
         for c in self.cities:
@@ -3157,11 +3171,11 @@ class Opinion:
             addedHostility += 0.0001
             addedIntervention -= 0.0001
         if self.culture.society in CombatTools.aggressiveSocieties:
-            addedHostility += 0.0002
-            addedIntervention += 0.0003
+            addedHostility += 0.0001
+            addedIntervention += 0.0002
         if self.culture.society in CombatTools.warlikeSocieties:
-            addedHostility += 0.0007
-            addedIntervention += 0.0007
+            addedHostility += 0.0006
+            addedIntervention += 0.0006
         distToCapital = n.dist(self.culture.origin)
         addedHostility *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
         addedIntervention *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
@@ -3221,8 +3235,8 @@ class Opinion:
         if self.culture.society in CombatTools.aggressiveSocieties:
             addedIntervention += 0.0001
         if self.culture.society in CombatTools.warlikeSocieties:
-            addedHostility += 0.0007
-            addedIntervention += 0.0007
+            addedHostility += 0.0005
+            addedIntervention += 0.0005
         distToCapital = n.dist(self.culture.origin)
         addedHostility *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
         addedIntervention *= clamp(self.falloffDist/distToCapital,0.5,1)*coefficient
@@ -3251,7 +3265,7 @@ class Opinion:
         # [0,-1,0] Weaker
         # [0,0,1] Interventionist
         # [0,0,-1] Isolationist
-        actions["war"] = [1,0.4,1,0.85]
+        actions["war"] = [1,0.4,1,0.88]
         actions["alliance"] = [-1,-0.3,1,0.9]
         actions["aid"] = [-0.9,0.8,0.6,1]
         actions["closed borders"] = [0.8,-0.35,-0.9,1]
@@ -3486,8 +3500,9 @@ class Belligerent:
     def getDefensibleNodes(self):
         return self.culture.getDefensibleNodes()
     def getAttackableNodes(self):
-        # Todo: reduce chance of including certain nodes to simulate having/not having intelligence of places
-        return self.opponent.getDefensibleNodes()
+        # Todo: reduce chance of including further-away/less-major nodes to simulate having/not having intelligence of places
+        targetNodes = self.opponent.getDefensibleNodes().copy()
+        return targetNodes
     def setStance(self):
         newStance = self.stance
         if self.delegatedStrength > self.enemyDelegatedStrength:
@@ -3696,7 +3711,7 @@ class Battle:
             if e.kind in ["army","fleet"]:
                 likelyOutcomes = ["massive casualties","some casualties","some casualties","minimal casualties","minimal casualties"]
                 if entityChance > 0.75:
-                    likelyOutcomes = ["some casualties","some casualties","minimal casualties","minimal casualties","unscathed"]
+                    likelyOutcomes = ["some casualties","some casualties","minimal casualties","minimal casualties","unscathed","unscathed"]
                 if entityChance < 0.5:
                     likelyOutcomes = ["eliminated","taken prisoner","taken prisoner","massive casualties","some casualties","some casualties","minimal casualties"]
                 if entityChance < 0.25:
@@ -3719,7 +3734,7 @@ class Battle:
                 likelyOutcomes = ["eliminated","eliminated","eliminated","unscathed","unscathed","unscathed"]
                 if entityChance < 0.33:
                     likelyOutcomes = ["eliminated","eliminated","eliminated","unscathed"]
-                if entityChance> 0.66:
+                if entityChance > 0.66:
                     likelyOutcomes = ["eliminated","unscathed","unscathed","unscathed"]
                 outcomeRoll = (entityChance + (random.random()*4))/5
                 outcomeIndex = round(outcomeRoll*(len(likelyOutcomes)-1))
@@ -3783,10 +3798,10 @@ class Battle:
         for a in self.battlingEntities:
             eventActors.append(a)
             sumImportance += a.importance
-            sumImportance *= 1.02
+        sumImportance = sumImportance*(1.02**len(self.battlingEntities))
         eventActors.sort(reverse=False,key=lambda actor: actor.culture.name)
         e = Event(m=self.node.myMap,a=0,kind="battle",sub=eventSubject,actrs=eventActors,loc=eventLocation)
-        e.importance = 5+((sumImportance/len(eventActors))*random.uniform(0.7,1.5))
+        e.importance = 4+((sumImportance/len(eventActors))*random.uniform(0.7,1.5)) + (len(self.battlingEntities)/2)
     def numParties(self):
         return len(self.parties.keys())        
     def partyWeight(self,partyKey):
@@ -3827,6 +3842,7 @@ class Population:
         self.orderCooldown = 2
         self.importance = math.ceil((random.random()**2)*20)
         self.magic = []
+        self.constellation = None
         self.birthEvent = None
         self.deathEvent = None
         self.killedBy = []
@@ -4148,6 +4164,7 @@ class Population:
             return -1
         for i in unclaimedItems:
             chanceToClaim = 1/(itemCount+1)
+            chanceToClaim *= (1.02**len(self.inventory))
             if random.random() < chanceToClaim:
                 self.takeItem(i)
     def getNearestOfNodes(self,l=[]):
@@ -4174,6 +4191,9 @@ class Population:
             followRivers = False
         if self.kind == "fleet":
             landy = 0
+        for f in self.followers:
+            if f.kind == "fleet":
+                landy = 0
         self.path = Path(self.location,n,land=landy,followRivers=followRivers)
     def tempDistance(self,n):
         if self.location == None:
@@ -4254,6 +4274,9 @@ class Population:
             return -1
         if self.profession == "roadbuilder":
             self.location.linkRoads(nextNode)
+        if self.kind == "fleet" and nextNode.shipTraversable() == False:
+            self.path = None
+            return -1
         stuck = False
         if nextNode == self.prevNode and self.prevNode != None:
             stuck = True
@@ -4291,6 +4314,9 @@ class Population:
             return
         if self.profession == "tactician":
             return
+        for f in self.followers:
+            if f.kind in ["army","fleet"]:
+                return
         if random.random() < 0.94:
             return
         amicableCultures = self.culture.amicableCultureOpinions()
@@ -4332,6 +4358,10 @@ class Population:
             return []
         return [ff.profession for ff in self.followers]
     def formUp(self):
+        merger = self.findMerger()
+        if merger != -1:
+            self.merge(merger)
+            return
         war = self.getCommittedWar()
         chosenLeader = self
         chosenStrength = self.unitPower()
@@ -4370,6 +4400,31 @@ class Population:
                         chosenLeader = potentialLeader
                         chosenImportance = potentialLeader.importance
         self.follow(chosenLeader)
+    def findMerger(self):
+        if self.kind not in ["army","fleet"]:
+            return -1
+        # Merge into an older army of the same type
+        possibleMergers = [e for e in self.location.entities if e.dead == 0 and e.number > 0 and e != self]
+        if len(possibleMergers) == 0:
+            return -1
+        possibleMergers = [e for e in possibleMergers if e.kind == self.kind and e.culture == self.culture and e.profession == self.profession and e.age > self.age]
+        if len(possibleMergers) == 0:
+            return -1
+        oldestMerger = possibleMergers[0]
+        for e in possibleMergers:
+            if e.age > oldestMerger.age:
+                oldestMerger = e
+        return e
+    def merge(self,merger):
+        unitCount = self.number
+        self.number = 0
+        myUnitProportion = unitCount/(merger.number+unitCount)
+        oldUnitProportion = merger.number/(merger.number+unitCount)
+        myUnitSkill = self.skill*myUnitProportion
+        oldUnitSkill = merger.skill*oldUnitProportion
+        merger.skill = myUnitSkill+oldUnitSkill
+        merger.number += unitCount
+        self.die(createEvent=False)
     def runBattles(self):
         if self.location == None:
             return -1
@@ -5286,9 +5341,9 @@ class Population:
         y = (y-1)-math.ceil(count/2)
         for n in range(count):
             if r == 1:
-                c = (0,0,0)
-            else:
                 c = self.culture.bannerColor
+            else:
+                c = (0,0,0)
             pts = [(x,y-2),(x-3,y+1),(x+3,y+1)]
             drawer.polygon(pts,fill=c)
             y = y+2
@@ -5611,6 +5666,7 @@ class Language:
 
 class Star:
     def __init__(self,a,d):
+        self.constellations = []
         self.rightAscension = a
         self.declination = d
         # distance between 1 and 20 pc
@@ -5621,6 +5677,79 @@ class Star:
         self.absoluteMagnitude = random.uniform(-6,8)-(self.temperature/120)
         self.apparentMagnitude = self.absoluteMagnitude+5*(math.log(self.distance,10)-1)
         self.brightness = math.floor(clamp(255-(14*abs(-9-self.apparentMagnitude)),0,255))
+
+class Constellation:
+    def __init__(self,c,rootStar):
+        self.culture = c
+        self.name = None
+        self.myMap = self.culture.myMap
+        self.allStars = self.myMap.stars
+        self.stars = []
+        self.lines = []
+        self.stars.append(rootStar)
+        rootStar.constellations.append(self.culture.name)
+        currentStar = rootStar
+        starCount = random.randint(3,12)
+        for n in range(starCount):
+            self.addStar(currentStar)
+            currentStar = self.stars[-1]
+            if random.random() < 0.4:
+                currentStar = random.choice(self.stars)
+        self.importance = len(self.stars)/12
+        self.importance = self.importance*0.7
+        self.importance = (self.importance+(random.uniform(0.2,0.65)))/2
+        self.deity = None
+        possibleDeities = [d for d in self.culture.deities if d.constellation == None]
+        if len(possibleDeities) > 0 and random.random() < 0.75:
+            self.deity = random.choice(possibleDeities)
+            self.deity.constellation = self
+            self.importance = (self.importance+self.importance+0.7)/3
+            self.name = self.deity.justName()
+        if self.name == None:
+            self.name = self.culture.language.genName()
+    def addStar(self,currentStar):
+        foundStar = False
+        tries = 0
+        while foundStar == False and tries < 10000:
+            tries += 1
+            addedStar = random.choice(self.allStars)
+            foundStar = True
+            if addedStar == currentStar:
+                foundStar = False
+                continue
+            if addedStar in self.stars and random.random() < 0.66:
+                foundStar = False
+                continue
+            angleBetweenStars = sphericalAngle((currentStar.rightAscension,currentStar.declination),(addedStar.rightAscension,addedStar.declination))
+            angleLimit = random.uniform(0.2,0.6)
+            if angleLimit**2 < angleBetweenStars:
+                foundStar = False
+                continue
+            magnitudeLimit = -1*random.randint(0,8)
+            magnitudeRoll = random.random()
+            if magnitudeRoll < 0.66:
+                magnitudeLimit = -1*random.randint(4,8)
+            if magnitudeRoll < 0.33:
+                magnitudeLimit = -1*random.randint(6,8)
+            if addedStar.apparentMagnitude > magnitudeLimit:
+                foundStar = False
+                continue
+            if addedStar not in self.stars and self.culture.name in addedStar.constellations and random.random() < 0.9:
+                foundStar = False
+                continue
+        if tries == 10000:
+            return
+        self.stars.append(addedStar)
+        self.lines.append([currentStar,addedStar])
+        addedStar.constellations.append(self.culture.name)
+    def constellationNotes(self):
+        s = "\n"
+        s += self.name
+        if self.deity != None:
+            s += "\nThe "
+            s += self.deity.nameFull()
+        s += "\n"
+        return s
 
 class Map:
     def __init__(self,aAtlas,numNodes,mapDimX,mapDimY):
@@ -5645,6 +5774,8 @@ class Map:
         self.biomeColors()
         self.genStars()
         self.displayNo = None
+        self.displayCulture = None
+        self.displayConst = None
         self.infoGui = None
         self.extraGui = None
         self.viewmode = 0
@@ -5905,7 +6036,7 @@ class Map:
         for l in self.landmasses:
             l.cullStreams(10)
     def addRandomPeaks(self):
-        peakCount = random.randint(2,5)
+        peakCount = random.randint(1,7)
         for n in range(peakCount):
             peakHeight = random.uniform(0.72,0.92)
             peakRadius = random.randint(65,175)
@@ -6086,13 +6217,49 @@ class Map:
             p.carnivores = clamp(((p.herbivores*1.2)**1.5),0,1)
     def genStars(self):
         self.stars = []
-        numStars = 1000
+        self.constellations = []
+        p0 = randomPointOnSphere()
+        p1 = antipodes(p0)
+        p2 = randomPointOnSphere()
+        while sphericalAngle(p2,p0) < 1.3 or sphericalAngle(p2,p0) > 1.7:
+            p2 = randomPointOnSphere()
+        p3 = antipodes(p2)
+        p4 = sphericalMidpoint(p0,p2)
+        p5 = sphericalMidpoint(p1,p3)
+        p6 = sphericalMidpoint(p0,p3)
+        p7 = sphericalMidpoint(p1,p2)
+        p8 = sphericalMidpoint(p0,p4)
+        p9 = sphericalMidpoint(p1,p5)
+        p10 = sphericalMidpoint(p0,p6)
+        p11 = sphericalMidpoint(p1,p7)
+        p12 = sphericalMidpoint(p4,p2)
+        p13 = sphericalMidpoint(p5,p3)
+        p14 = sphericalMidpoint(p6,p3)
+        p15 = sphericalMidpoint(p7,p2)
+        self.discAnchorPoints = [p0,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11,p12,p13,p14,p15]
+        self.galacticDiscPoints = self.discAnchorPoints.copy()
+        for n in range(1200):
+            discPoint0 = random.choice(self.galacticDiscPoints)
+            discPoint1 = random.choice(self.discAnchorPoints)
+            if sphericalAngle(discPoint0,discPoint1) > 0.001 and sphericalAngle(discPoint0,antipodes(discPoint1)) > 0.001:
+                midpoint = sphericalMidpoint(discPoint0,discPoint1)
+                self.galacticDiscPoints.append(midpoint)
+        self.galacticCenterpoint = random.choice(self.galacticDiscPoints)
+        self.galacticDiscStrength = random.uniform(0.05,0.8)
+        self.galacticCenterStrength = random.uniform(0.05,0.65)
+        numStars = random.randint(1200,4000)
         for e in range(numStars):
-            u1 = random.random()
-            u2 = random.random()
-            latitude = math.acos((2*u1)-1)-(math.pi/2)
-            longitude = 2*u2*math.pi
-            newStar = Star(longitude,latitude)
+            coords = randomPointOnSphere()
+            if random.random() < self.galacticCenterStrength:
+                coords = sphericalMidpoint(coords,self.galacticCenterpoint)
+                if random.random() < self.galacticCenterStrength:
+                    coords = sphericalMidpoint(coords,self.galacticCenterpoint)
+            if random.random() < self.galacticDiscStrength:
+                galacticPlanePoint = nearestPointOnSphere(coords,self.galacticDiscPoints)
+                coords = sphericalMidpoint(coords,galacticPlanePoint)
+                if random.random() < self.galacticDiscStrength:
+                    coords = sphericalMidpoint(coords,galacticPlanePoint)
+            newStar = Star(coords[0],coords[1])
             self.stars.append(newStar)
     def biomeColors(self):
         bColors = {}
@@ -6556,6 +6723,23 @@ class Map:
             for r in l.rivers:
                 r.drawRiver(graphDraw,self.xDim)
         visualAtlas.show()
+    def displayConstellation(self,event):
+        visibleConstellations = [c for c in self.constellations if c.culture == self.displayCulture]
+        clickedPos = (event.x,event.y)
+        dist = 1000
+        constellation = None
+        for c in visibleConstellations:
+            distToConstellation = 1000
+            for s in c.stars:
+                starPos = self.starCoordinates(s)
+                starDist = distance2d(clickedPos,starPos)
+                if starDist < distToConstellation:
+                    distToConstellation = starDist
+            if distToConstellation < dist:
+                dist = distToConstellation
+                constellation = c
+        self.displayConst = constellation
+        self.redrawCelestial()
     def displayNode(self,event):
         clickedNode = self.nearestNode(event.x-2,event.y-2)
         if len(clickedNode.entities) == 0 and clickedNode.city == None and clickedNode.getStructure() == None:
@@ -6567,6 +6751,14 @@ class Map:
         self.displayString.set(self.nodeInfo(clickedNode))
         self.displayNo = clickedNode
         self.redraw()
+    def redrawCelestial(self):
+        self.drawCelestial()
+        photo = Image.open(self.celestialFilename)
+        self.skyImg = ImageTk.PhotoImage(photo)
+        self.skyLbl.config(image = self.skyImg)
+        self.skyLbl.image = self.skyImg
+        if self.displayConst != None:
+            self.constString.set(self.displayConst.constellationNotes())
     def redraw(self):
         visualAtlas = Image.new("RGB",(mapDimX,mapDimY),"white")
         graphDraw = ImageDraw.Draw(visualAtlas)
@@ -7116,13 +7308,20 @@ class Map:
         if self.infoGui != None:
             self.infoGui.destroy()
         self.infoGui = Toplevel()
+        self.displayConst = None
+        if self.displayNo != None:
+            self.displayCulture = self.displayNo.culture
         self.drawCelestial()
         photo = Image.open(self.celestialFilename)
-        self.townImg = ImageTk.PhotoImage(photo)
-        self.townLbl = Label(self.infoGui,image=self.townImg)
-        self.townLbl.config(borderwidth=2)
-        self.townLbl.photo = photo
-        self.townLbl.pack()
+        self.skyImg = ImageTk.PhotoImage(photo)
+        self.skyLbl = Label(self.infoGui,image=self.skyImg)
+        self.skyLbl.config(borderwidth=2)
+        self.skyLbl.pack(anchor=N,side=TOP)
+        self.skyLbl.bind("<Button-1>",self.displayConstellation)
+        self.constString = StringVar()
+        self.constString.set(" ")
+        desc = Label(self.infoGui,textvariable=self.constString)
+        desc.pack(anchor=S,side=BOTTOM)
     def entitiesInfo(self):
         if self.displayNo == None:
             return -1
@@ -7178,17 +7377,45 @@ class Map:
         else:
             self.drawpops += 1
         self.redraw()
+    def starCoordinates(self,star):
+        mollweideY = (star.declination+(math.pi/2))*(self.skyDimY/(math.pi))
+        angularFactor = math.sqrt(1-((star.declination/(math.pi/2))**2))
+        mollweideX = (((star.rightAscension-(math.pi))*angularFactor)*(self.skyDimX/(math.pi*2)))+(self.skyDimX/2)
+        return (mollweideX,mollweideY)
     def drawCelestial(self):
-        skyDimX = math.floor(mapDimX*1.5)
-        skyDimY = math.floor(skyDimX/2)
-        visualSky = Image.new("HSV",(skyDimX,skyDimY),(0,0,80))
+        self.skyDimX = math.floor(mapDimX*1.5)
+        self.skyDimY = math.floor(self.skyDimX/2)
+        visualSky = Image.new("HSV",(self.skyDimX,self.skyDimY),(0,0,70))
         graphDraw = ImageDraw.Draw(visualSky)
-        graphDraw.ellipse([(0,0),(skyDimX,skyDimY)],fill=(0,0,0))
+        graphDraw.ellipse([(0,0),(self.skyDimX,self.skyDimY)],fill=(0,0,0))
+        drawConstellations = [c for c in self.constellations if c.culture == self.displayCulture]
+        for constellation in drawConstellations:
+            lineColor = constellation.culture.bannerColor
+            dimmingFactor = clamp(constellation.importance,0.2,0.7)
+            lineColor = (lineColor[0]*dimmingFactor,lineColor[1]*dimmingFactor,lineColor[2]*dimmingFactor)
+            lineColor = rgbToHsv(lineColor)
+            for line in constellation.lines:
+                starCoords0 = self.starCoordinates(line[0])
+                starCoords1 = self.starCoordinates(line[1])
+                ellipseWidthAt0 = self.skyDimX*math.sqrt(1-((line[0].declination/(math.pi/2))**2))
+                ellipseWidthAt1 = self.skyDimX*math.sqrt(1-((line[1].declination/(math.pi/2))**2))
+                lineWidth = starCoords0[0]-starCoords1[0]
+                if abs(lineWidth) < ((ellipseWidthAt0+ellipseWidthAt1)/2)/1.5 or abs(line[0].declination) > 1.33:
+                    graphDraw.line([starCoords0,starCoords1],fill=lineColor,width=1)
+        if self.displayConst != None:
+            lineColor = (0,0,255)
+            for line in self.displayConst.lines:
+                starCoords0 = self.starCoordinates(line[0])
+                starCoords1 = self.starCoordinates(line[1])
+                ellipseWidthAt0 = self.skyDimX*math.sqrt(1-((line[0].declination/(math.pi/2))**2))
+                ellipseWidthAt1 = self.skyDimX*math.sqrt(1-((line[1].declination/(math.pi/2))**2))
+                lineWidth = starCoords0[0]-starCoords1[0]
+                if abs(lineWidth) < ((ellipseWidthAt0+ellipseWidthAt1)/2)/1.5 or abs(line[0].declination) > 1.33:
+                    graphDraw.line([starCoords0,starCoords1],fill=lineColor,width=2)
         for star in self.stars:
-            mollweideY = (star.declination+(math.pi/2))*(skyDimY/(math.pi))
-            angularFactor = math.sqrt(1-((star.declination/(math.pi/2))**2))
-            mollweideX = (((star.rightAscension-(math.pi))*angularFactor)*(skyDimX/(math.pi*2)))+(skyDimX/2)
-            pts = [(mollweideX,mollweideY)]
+            pts = self.starCoordinates(star)
+            mollweideX = pts[0]
+            mollweideY = pts[1]
             starCol = (star.temperature,star.saturation,star.brightness)
             graphDraw.point(pts,fill=starCol)
             if star.apparentMagnitude < -1 and star.apparentMagnitude > -5:

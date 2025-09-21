@@ -8,6 +8,11 @@ Created on Sat Mar  3 04:02:32 2018
 import random
 import math
 import numpy as np
+import colorsys
+
+def rgbToHsv(col):
+    dec = colorsys.rgb_to_hsv(col[0]/255,col[1]/255,col[2]/255)
+    return (math.floor(dec[0]*255),math.floor(dec[1]*255),math.floor(dec[2]*255))
 
 def factorsOf(a):
     factrs = [a]
@@ -49,6 +54,9 @@ def drawCircle(drawer,x,y,radius,color,out=False):
     if out == True:
         drawer.ellipse([(x1,y1),(x2,y2)],outline=color,fill=None)
 
+def avg2(v1,v2):
+    return ((v1+v2)/2)
+
 def lengthDirX(length, angle):
   radian_angle = math.radians(angle)
   return length * math.cos(radian_angle)
@@ -56,6 +64,85 @@ def lengthDirX(length, angle):
 def lengthDirY(length, angle):
   radian_angle = math.radians(angle)
   return length * math.sin(radian_angle)
+
+def midpoint3d(coords0,coords1):
+    return (avg2(coords0[0],coords1[0]),avg2(coords0[1],coords1[1]),avg2(coords0[2],coords1[2]))
+
+def sphericalMidpoint(coords0,coords1):
+    cart0 = sphericalToCartesian(coords0)
+    cart1 = sphericalToCartesian(coords1)
+    cartMidpoint = midpoint3d(cart0,cart1)
+    return cartesianToSpherical(cartMidpoint)
+
+def sphericalToCartesian(coords):
+    long = coords[0]
+    lat = coords[1]
+    x = math.cos(lat)*math.cos(long)
+    y = math.cos(lat)*math.sin(long)
+    z = math.sin(lat)
+    return (x,y,z)
+
+def cartesianToSpherical(coords):
+    x = coords[0]
+    y = coords[1]
+    z = coords[2]
+    r = math.sqrt((x**2)+(y**2)+(z**2))
+    x = x/r
+    y = y/r
+    z = z/r
+    long = math.atan2(y,x)
+    lat = math.asin(z)
+    if long < 0:
+        long = (2*math.pi)+long
+    return (long,lat)
+
+def randomPointOnSphere():
+    u1 = random.random()
+    u2 = random.random()
+    latitude = math.acos((2*u1)-1)-(math.pi/2)
+    longitude = 2*u2*math.pi
+    return (longitude,latitude)
+
+def antipodes(coords):
+    long0 = coords[0]
+    lat0 = coords[1]
+    long1 = long0+math.pi
+    if long0 > math.pi:
+        long1 = long0-math.pi
+    lat1 = -lat0
+    return (long1,lat1)
+
+def nearestPointOnSphere(pt,searchFrom=[]):
+    if searchFrom == []:
+        return pt
+    if len(searchFrom) == 1:
+        return searchFrom[0]
+    dist = 1000
+    nearestPt = searchFrom[0]
+    for searchFromPoint in searchFrom:
+        angleDist = sphericalAngle(pt,searchFromPoint)
+        if angleDist < dist:
+            dist = angleDist
+            nearestPt = searchFromPoint
+    return nearestPt
+
+def sphericalAngle(coords0,coords1):
+    long0 = coords0[0]
+    long1 = coords1[0]
+    lat0 = coords0[1]
+    lat1 = coords1[1]
+    try:
+        if coords0 == coords1:
+            return 0
+        if long0==long1:
+            return abs(lat0-lat1)
+        if lat0==lat1:
+            return abs(long0-long1)
+        longitudeDiff = abs(long0-long1)
+        centralAngle = math.acos((math.sin(lat0)*math.sin(lat1)) + (math.cos(lat0)*math.cos(lat1)*math.cos(longitudeDiff)))
+        return abs(centralAngle)
+    except:
+        return math.pi
 
 def getPrime(num):
     primesList = [2,3,5,7,11,13,17,19,23,29,31,37,41,43,47,53,59,61,67,71,73,79,83,89,97,101,103,107,109,113,127,131,137,139,149,151]
@@ -131,7 +218,7 @@ class CombatTools:
     endWarDistance = 1400
     militaryAge = 17
     warlikeSocieties = ["Privateers","Military dictatorship"]
-    aggressiveSocieties = ["Imperiun","Empire","Hegemony","Monarchy",
+    aggressiveSocieties = ["Imperium","Empire","Hegemony","Monarchy",
                                     "Religious zealots","Revolutionary commune",
                                     "Shamanistic warriors"]
     battlingKinds = ["army","fleet","tactician","beast","magician"]
@@ -151,7 +238,7 @@ class CombatTools:
     # First value is offensive modifier; second value is defensive modifier; third value is unit weight modifier
     unitBalance = {"assault infantry":[1,1,1.2],
                             "guard infantry":[1,1.5,1.2],
-                            "siege":[1.25,0.75,2.5],
+                            "siege":[1.25,1,2.5],
                             "artillery":[2,0.5,2],
                             "ranged infantry":[1.25,0.75,1.4],
                             "mechanized":[1.5,1.5,3],
@@ -170,6 +257,9 @@ def clamp(x,minimum,maximum):
         return maximum
     else:
         return x
+
+def distance2d(a,b):
+    return math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2)
 
 def distance3d(a,b):
     return math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2)
@@ -244,7 +334,7 @@ def synonym(x,seed=0,exclusive=0):
     s["large"] = ["large","sizable","grand","great"]
     s["huge"] = ["huge","giant","tremendous","colossal","massive"]
     s["gigantic"] = ["gigantic","titanic","humongous","gargantuan","vast"]
-    s["book"] = ["book","record","volume","document","treatise","paper","study","codex","essay","meditations","manifesto","meditation","essays","records"]
+    s["book"] = ["book","record","volume","document","critique","analysis","treatise","paper","study","codex","essay","meditations","manifesto","meditation","essays","records"]
     s["story"] = ["story","novel","epic","tale","legend","chronicle"]
     s["piece"] = ["painting","woodcut","drawing","sculpture","statue","bust","etching",
      "tapestry","fresco","mural"]
@@ -299,7 +389,7 @@ def synonym(x,seed=0,exclusive=0):
     s["builders"] = ["builders","construction","manufacturing","craftsmen","fabrication"]
     s["ruins"] = ["ruins","wreckage","crags"]
     s["temperature"] = ["temperature","heat","sunlight","warmth","thermodynamics"]
-    s["minister"] = ["minister","secretary","chancellor","director","head","premier","chair","magistrate","chamberlain"]
+    s["minister"] = ["minister","secretary","chancellor","director","premier","chair","magistrate","chamberlain"]
     s["war"] = ["war","defense","security"]
     s["health"] = ["health","medicine","healthcare"]
     s["infrastructure"] = ["infrastructure","transporation"]

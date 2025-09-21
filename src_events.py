@@ -149,8 +149,17 @@ class Event:
         if self.kind == "death":
             if len(self.actors) == 0:
                 s += " died"
-            else:
+            elif len(self.actors) == 1:
                 s += " was killed by the " + self.actors[0].nameFull()
+            else:
+                s += " was killed by "
+                for k in self.actors:
+                    if k != self.actors[0]:
+                        s += ", "
+                    if k == self.actors[-1]:
+                        s += "and "
+                    s += "the "
+                    s += k.nameFull()
         if self.kind == "disbanding":
             if len(self.actors) == 0:
                 s += " disbanded"
